@@ -1,0 +1,153 @@
+# Overlay: GitHub issue and pull-request authorship for `gh` and `gh api`.
+#
+# What this enables (after `apply.py --sandbox <sandbox-name> github-issues-prs.yaml`):
+#   gh issue create / comment / edit / close / reopen
+#   gh pr create / comment / review / close / reopen / ready / convert-to-draft
+#   gh api -X POST /repos/{owner}/{repo}/issues   (and the other REST paths below)
+#
+# What this deliberately does NOT enable:
+#   gh pr merge / gh pr auto-merge   (mergePullRequest — excluded from this overlay)
+#   git push                         (git-receive-pack — use github-push.yaml)
+#   gh issue / pr delete / transfer  (destructive mutations)
+#   Any GitHub REST DELETE
+#
+# Transport note: `gh issue create`, `gh pr create`, and all comment/review
+# commands send GraphQL mutations, not REST. The REST paths below are for
+# explicit `gh api -X POST ...` calls. A successful
+# `gh issue create` does NOT prove the REST globs are correct — test them
+# separately with `gh api`.
+#
+# Apply:
+#   ./policy-overlays/apply.py --sandbox <sandbox-name> github-issues-prs.yaml
+# Combine with push:
+#   ./policy-overlays/apply.py --sandbox <sandbox-name> github-issues-prs.yaml github-push.yaml
+# Revoke (back to read-only baseline):
+#   ./policy-overlays/apply.py --sandbox <sandbox-name> --revert
+#
+# Debugging: if a `gh` command fails with "GraphQL operation blocked by endpoint
+# policy", apply github-graphql-audit.yaml first, re-run the command, and read
+# the operation name from `openshell logs <sandbox-name>`. Add the missing field below and
+# re-apply this overlay.
+#
+# Token permissions must also allow the selected operation. Issue writes need
+# Issues: Write and PR writes need Pull requests: Write on fine-grained tokens.
+# Repository and organization restrictions still apply at GitHub.
+
+network_policies:
+  # Replaces the base github_graphql entry (access: read-only → explicit rules
+  # that include mutations). apply.py replaces the whole key wholesale — the
+  # endpoints list below supersedes the one in policy.yaml.
+  #
+  # access and rules are mutually exclusive per endpoint (OpenShell rejects
+  # both). This entry uses rules, so the base entry's access: read-only is gone.
+  #
+  # The bare `operation_type: query` rule is required: graphql_allow_fields_match
+  # (sandbox-policy.rego:684-696) requires every root field to match when
+  # `fields` is present, which would break multi-field queries. A rule with no
+  # `fields` passes all queries unconditionally — gh auth status, gh issue list,
+  # all reads stay working.
+  #
+  # Mutation field names extracted from strings /usr/bin/gh (version 2.100.0):
+  #   gh issue create    -> createIssue
+  #   gh issue comment   -> addComment
+  #   gh issue edit      -> updateIssue, addLabelsToLabelable,
+  #                         removeLabelsFromLabelable, replaceActorsForAssignable
+  #   gh issue close     -> closeIssue
+  #   gh issue reopen    -> reopenIssue
+  #   gh pr create       -> createPullRequest + updatePullRequest (with --label/
+  #                         --assignee) + requestReviews (with --reviewer)
+  #   gh pr comment      -> addComment
+  #   gh pr review       -> addPullRequestReview
+  #   gh pr close        -> closePullRequest
+  #   gh pr reopen       -> reopenPullRequest
+  #   gh pr ready        -> markPullRequestReadyForReview
+  #   gh pr draft        -> convertPullRequestToDraft
+  #
+  # If a gh version update adds a new mutation not listed here, the command will
+  # fail with "GraphQL operation blocked by endpoint policy". Use
+  # github-graphql-audit.yaml to find the field name and add it.
+  github_graphql:
+    name: github-graphql
+    endpoints:
+      - host: api.github.com
+        port: 443
+        path: /graphql
+        protocol: graphql
+        enforcement: enforce
+        rules:
+          - allow: { operation_type: query }
+          - allow:
+              operation_type: mutation
+              fields:
+                # Issues
+                - createIssue
+                - updateIssue
+                - closeIssue
+                - reopenIssue
+                # Comments
+                - addComment
+                - updateIssueComment
+                # Labels / assignees
+                - addLabelsToLabelable
+                - removeLabelsFromLabelable
+                - replaceActorsForAssignable
+                # Pull requests
+                - createPullRequest
+                - updatePullRequest       # fired by gh pr create --label/--assignee
+                - requestReviews          # fired by gh pr create --reviewer
+                - closePullRequest
+                - reopenPullRequest
+                - markPullRequestReadyForReview
+                - convertPullRequestToDraft
+                - addPullRequestReview
+    binaries:
+      - { path: /usr/bin/gh }
+      - { path: /usr/local/bin/gh }
+
+  # REST writes for gh api.
+  #
+  # Globs use two wildcards between `repos` and the resource (`/repos/*/*/...`)
+  # because the GitHub API path shape is /repos/{owner}/{repo}/..., and
+  # OpenShell's glob engine does NOT let `*` cross `/` (sandbox-policy.rego:740,
+  # `glob.match(pattern, ["/"], path)`). The old overlay had single-segment globs
+  # (/repos/*/issues) that matched /repos/OWNER/issues — a path GitHub does not
+  # serve — and always 403'd on the real /repos/OWNER/REPO/issues.
+  #
+  # IMPORTANT: this endpoint is path-less (specificity 0), the same as the
+  # provider profile's REST endpoint on api.github.com:443. ambiguity.rs:88-97
+  # compares protocol and enforcement when specificities tie. Both must be
+  # protocol: rest and enforcement: enforce, or `openshell policy set` will
+  # hard-fail. Do NOT change enforcement to audit here.
+  github_issues_prs:
+    name: github-issues-prs
+    endpoints:
+      - host: api.github.com
+        port: 443
+        protocol: rest
+        enforcement: enforce
+        rules:
+          # Issues: create, edit, close
+          - allow: { method: POST,  path: "/repos/*/*/issues" }
+          - allow: { method: PATCH, path: "/repos/*/*/issues/*" }
+          # Issue comments: create, edit
+          - allow: { method: POST,  path: "/repos/*/*/issues/*/comments" }
+          - allow: { method: PATCH, path: "/repos/*/*/issues/comments/*" }
+          # Issue labels and assignees (gh issue edit --label, --assignee)
+          - allow: { method: POST,  path: "/repos/*/*/issues/*/labels" }
+          - allow: { method: POST,  path: "/repos/*/*/issues/*/assignees" }
+          # Pull requests: open, edit
+          - allow: { method: POST,  path: "/repos/*/*/pulls" }
+          - allow: { method: PATCH, path: "/repos/*/*/pulls/*" }
+          # PR review comments: create, reply, edit
+          - allow: { method: POST,  path: "/repos/*/*/pulls/*/comments" }
+          - allow: { method: POST,  path: "/repos/*/*/pulls/comments/*/replies" }
+          - allow: { method: PATCH, path: "/repos/*/*/pulls/comments/*" }
+          # PR reviews: submit (events), add comment to pending review
+          - allow: { method: POST,  path: "/repos/*/*/pulls/*/reviews" }
+          - allow: { method: POST,  path: "/repos/*/*/pulls/*/reviews/*/events" }
+          - allow: { method: POST,  path: "/repos/*/*/pulls/*/reviews/*/comments" }
+          # PR reviewers
+          - allow: { method: POST,  path: "/repos/*/*/pulls/*/requested_reviewers" }
+    binaries:
+      - { path: /usr/bin/gh }
+      - { path: /usr/local/bin/gh }

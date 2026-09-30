@@ -1,0 +1,93 @@
+#!/usr/bin/env python3
+"""Start a command in a mounted project, with optional GWS initialization."""
+
+import json
+import os
+from pathlib import Path
+import sys
+import tempfile
+
+
+WORKSPACE = Path("/workspace")
+GWS_DIR = Path("/tmp/gws")
+GWS_KEYS = ("GWS_CLIENT_ID", "GWS_CLIENT_SECRET", "GWS_REFRESH_TOKEN")
+
+
+def fail(message: str) -> None:
+    print(f"exoshell-agent: {message}", file=sys.stderr)
+    raise SystemExit(2)
+
+
+def initialize_gws(environment: dict[str, str], directory: Path = GWS_DIR) -> None:
+    missing = [key for key in GWS_KEYS if not environment.get(key)]
+    if missing:
+        fail(f"GWS requires non-empty environment values: {', '.join(missing)}")
+    if not directory.is_dir():
+        fail(f"GWS directory is missing: {directory} (provide a writable directory there)")
+
+    config_dir = directory / "config"
+    try:
+        config_dir.mkdir(mode=0o700, exist_ok=True)
+        if config_dir.is_symlink() or not config_dir.is_dir():
+            fail("GWS config path is not a directory")
+        config_dir.chmod(0o700)
+    except OSError:
+        fail("could not prepare private GWS config directory")
+
+    credentials = {
+        "type": "authorized_user",
+        "client_id": environment["GWS_CLIENT_ID"],
+        "client_secret": environment["GWS_CLIENT_SECRET"],
+        "refresh_token": environment["GWS_REFRESH_TOKEN"],
+    }
+    target = directory / "credentials.json"
+    temporary = None
+    try:
+        with tempfile.NamedTemporaryFile(mode="w", encoding="utf-8", dir=directory, delete=False) as file:
+            temporary = Path(file.name)
+            os.fchmod(file.fileno(), 0o600)
+            json.dump(credentials, file)
+            file.write("\n")
+            file.flush()
+            os.fsync(file.fileno())
+        os.replace(temporary, target)
+    except (OSError, UnicodeError):
+        fail("could not write GWS credentials file")
+    finally:
+        if temporary is not None:
+            temporary.unlink(missing_ok=True)
+
+    environment["GOOGLE_WORKSPACE_CLI_CONFIG_DIR"] = str(config_dir)
+    environment["GOOGLE_WORKSPACE_CLI_CREDENTIALS_FILE"] = str(target)
+
+
+def main(arguments: list[str]) -> None:
+    if len(arguments) < 3 or arguments[1] != "--":
+        fail("usage: exoshell-agent PROJECT -- COMMAND [ARG ...]")
+    project = Path(arguments[0])
+    if not project.is_absolute():
+        fail("PROJECT must be an absolute directory below /workspace")
+    try:
+        project = project.resolve(strict=True)
+    except (OSError, RuntimeError):
+        fail("PROJECT does not exist")
+    if not project.is_dir() or not project.is_relative_to(WORKSPACE):
+        fail("PROJECT must be a directory below /workspace")
+
+    environment = os.environ.copy()
+    if environment.get("EXOSHELL_GWS") == "1":
+        initialize_gws(environment)
+    try:
+        os.chdir(project)
+    except OSError:
+        fail("could not enter PROJECT")
+    try:
+        os.execvpe(arguments[2], arguments[2:], environment)
+    except FileNotFoundError:
+        fail(f"command not found: {arguments[2]}")
+    except OSError:
+        fail(f"could not start command: {arguments[2]}")
+
+
+if __name__ == "__main__":
+    main(sys.argv[1:])

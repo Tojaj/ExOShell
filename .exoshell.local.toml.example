@@ -1,0 +1,28 @@
+# Copy to .exoshell.local.toml and adjust paths for this machine.
+image = "localhost/exoshell-local:latest"
+host_share = "/home/you/src"
+agent = "codex"
+
+# Providers used by every agent.
+providers = ["gh-personal", "gws-oauth"]
+# Optionally add only the package registries this project needs:
+# providers = ["gh-personal", "gws-oauth", "npm-registry", "pypi-packages", "ghcr-registry"]
+
+# Optional integrations are disabled when omitted.
+# policy = "policies/policy.yaml"
+# kubeconfig = "/home/you/.kube/config"
+# gws = true
+# github_host = "github.example.com"
+# gitlab_host = "gitlab.example.com"
+
+[agents.codex]
+providers = ["codex"]
+# Add "atlassian-mcp" after configuring the optional Atlassian integration.
+
+[agents.claude]
+providers = ["claude-code"]
+# Add "atlassian-mcp" after configuring the optional Atlassian integration.
+
+[agents.opencode]
+providers = ["opencode-openrouter"]
+# Add "atlassian-mcp" after configuring the optional Atlassian integration.

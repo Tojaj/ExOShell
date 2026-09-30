@@ -1,0 +1,224 @@
+version: 1
+filesystem_policy:
+  include_workdir: true
+  read_only:
+    - /usr
+    # /usr/local/bin/ast-grep resolves into this npm prefix.
+    - /opt/ast-grep
+    - /lib
+    - /lib64
+    - /bin
+    - /sbin
+    - /etc
+    - /proc
+    - /dev/urandom
+    - /var/log
+    # Present only if bind-mounted at create time (Landlock skips missing paths).
+    - /sandbox/.kube/config
+  read_write:
+    - /tmp
+    - /dev/null
+    - /workspace               # configured host share
+    # Agent runtime state is writable and discarded with the sandbox.
+    - /sandbox/.codex
+    - /sandbox/.claude
+    - /sandbox/.config/opencode
+    - /sandbox/.cache/opencode
+    - /sandbox/.local/share/opencode
+landlock:
+  compatibility: best_effort
+
+process:
+  run_as_user: sandbox
+  run_as_group: sandbox
+
+network_policies:
+  # Codex downloads plugin archives from GitHub or a ChatGPT export URL.
+  # Keep these hosts outside the Codex provider's API-key binding.
+  codex_plugin_downloads:
+    name: codex-plugin-downloads
+    endpoints:
+      - { host: codeload.github.com, port: 443, protocol: rest, enforcement: enforce, access: read-only }
+      - { host: files.openai.com, port: 443, protocol: rest, enforcement: enforce, access: read-only }
+    binaries:
+      - { path: /usr/bin/codex }
+      - { path: /usr/local/bin/codex }
+      - { path: /usr/lib/node_modules/@openai/** }
+      - { path: /sandbox/.codex/packages/app-server-daemon/releases/*/bin/codex }
+
+  # OpenCode reads its model catalog from this host.
+  opencode_model_catalog:
+    name: opencode-model-catalog
+    endpoints:
+      - { host: models.opencode.ai, port: 443, protocol: rest, enforcement: enforce, access: read-only }
+    binaries:
+      - { path: /usr/bin/opencode }
+      - { path: /usr/local/bin/opencode }
+      - { path: /usr/lib/node_modules/opencode-ai/bin/opencode.exe }
+      - { path: /usr/lib/node_modules/opencode-ai/** }
+
+  # OpenCode's site also serves account and inference requests, which may POST.
+  opencode_site:
+    name: opencode-site-audit
+    endpoints:
+      - { host: opencode.ai, port: 443, protocol: rest, enforcement: audit, access: full }
+    binaries:
+      - { path: /usr/bin/opencode }
+      - { path: /usr/local/bin/opencode }
+      - { path: /usr/lib/node_modules/opencode-ai/bin/opencode.exe }
+      - { path: /usr/lib/node_modules/opencode-ai/** }
+
+  # The ONE /graphql endpoint for api.github.com.
+  #
+  # This must stay in this file (or any --policy file used with the github-cli
+  # provider profile). The github-cli profile deliberately omits its /graphql
+  # endpoint so overlays can replace it wholesale. A second /graphql entry
+  # intersects with this one, so the stricter rule always wins. Keeping the
+  # endpoint here lets `apply.py --revert` drop back to read-only instantly.
+  #
+  # Baseline: access: read-only -> queries only (expands to operation_type: query).
+  # `gh auth status` sends query UserCurrent{viewer{login}} - passes here.
+  # `gh issue create` sends mutation createIssue - denied here, allowed only when
+  # the github-issues-prs overlay is active.
+  #
+  # binaries is load-bearing: without gh listed, POST /graphql falls through to
+  # the profile's path-less read-only REST endpoint and is denied. git is absent:
+  # it never speaks GraphQL.
+  github_graphql:
+    name: github-graphql
+    endpoints:
+      - host: api.github.com
+        port: 443
+        path: /graphql
+        protocol: graphql
+        access: read-only          # queries only; mutations need an overlay
+        enforcement: enforce
+    binaries:
+      - { path: /usr/bin/gh }
+      - { path: /usr/local/bin/gh }
+
+  # The ONE /api/graphql endpoint for gitlab.com.
+  #
+  # The gitlab-cli provider profile omits /api/graphql so overlays can replace
+  # it wholesale. Baseline is read-only (queries only). Unlike GitHub, glab
+  # issue/MR commands use REST; GraphQL is used by `glab api graphql` and
+  # `glab workitems list`.
+  #
+  # For additional GitLab instances, add a separate network policy key
+  # (e.g. gitlab_internal_graphql) with the appropriate host.
+  gitlab_com_graphql:
+    name: gitlab-com-graphql
+    endpoints:
+      - host: gitlab.com
+        port: 443
+        path: /api/graphql
+        protocol: graphql
+        access: read-only          # queries only; mutations need an overlay
+        enforcement: enforce
+    binaries:
+      - { path: /usr/bin/glab }
+      - { path: /usr/local/bin/glab }
+
+  # General HTTPS in AUDIT to discover URLs (D7). `**.example.com` does not
+  # match the apex `example.com` - list both. Bare `*`/`**` and TLD wildcards
+  # (`*.com`) are rejected.
+  #
+  # Omit hosts that attached providers already ENFORCE. Overlapping selectors
+  # with audit vs enforce are rejected. This policy assumes a GitHub provider
+  # and an agent inference provider enforce their respective API hosts.
+  # github_graphql is api.github.com at path /graphql (specificity 8 vs 0), so
+  # it does not cause an audit/enforce conflict. githubusercontent.com and the
+  # openai.com apex are not in those profiles.
+  agent_general:
+    name: agent-general-audit
+    endpoints:
+      # GitHub raw content (not in the GitHub provider profile)
+      - { host: "**.githubusercontent.com", port: 443, protocol: rest, enforcement: audit, access: full }
+
+      # OpenAI apex only (api/auth/chatgpt hosts come from the Codex provider)
+      - { host: openai.com, port: 443, protocol: rest, enforcement: audit, access: full }
+
+      # Shared model metadata; inference API hosts are enforced by providers.
+      - { host: models.dev, port: 443, protocol: rest, enforcement: audit, access: full }
+
+      # gitlab.com: audit until --provider glab-com is attached. When it is
+      # attached, remove the gitlab.com and **.gitlab.com rows: the provider's
+      # enforce endpoint on gitlab.com:443 (specificity 0) conflicts with audit
+      # at the same specificity. gitlab_com_graphql (specificity 12) is fine.
+      - { host: gitlab.com, port: 443, protocol: rest, enforcement: audit, access: full }
+      - { host: "**.gitlab.com", port: 443, protocol: rest, enforcement: audit, access: full }
+
+      # OpenShift client and release downloads.
+      - { host: mirror.openshift.com, port: 443, protocol: rest, enforcement: audit, access: full }
+
+      # Google Workspace CLI (gws): discovery + per-service APIs + OAuth.
+      # **.googleapis.com overlaps oauth2.googleapis.com, which the gws-oauth
+      # provider enforces with request_body_credential_rewrite. Enumerate
+      # per-service subdomains instead (the provider owns oauth2).
+      # The gws-oauth provider also owns accounts.google.com/o/oauth2/token;
+      # its exact path takes precedence over the google.com audit wildcard.
+      - { host: google.com, port: 443, protocol: rest, enforcement: audit, access: full }
+      - { host: "**.google.com", port: 443, protocol: rest, enforcement: audit, access: full }
+      - { host: googleapis.com, port: 443, protocol: rest, enforcement: audit, access: full }
+      - { host: www.googleapis.com, port: 443, protocol: rest, enforcement: audit, access: full }
+      - { host: admin.googleapis.com, port: 443, protocol: rest, enforcement: audit, access: full }
+      - { host: alertcenter.googleapis.com, port: 443, protocol: rest, enforcement: audit, access: full }
+      - { host: calendar-json.googleapis.com, port: 443, protocol: rest, enforcement: audit, access: full }
+      - { host: chat.googleapis.com, port: 443, protocol: rest, enforcement: audit, access: full }
+      - { host: classroom.googleapis.com, port: 443, protocol: rest, enforcement: audit, access: full }
+      - { host: cloudidentity.googleapis.com, port: 443, protocol: rest, enforcement: audit, access: full }
+      - { host: docs.googleapis.com, port: 443, protocol: rest, enforcement: audit, access: full }
+      - { host: drive.googleapis.com, port: 443, protocol: rest, enforcement: audit, access: full }
+      - { host: forms.googleapis.com, port: 443, protocol: rest, enforcement: audit, access: full }
+      - { host: gmail.googleapis.com, port: 443, protocol: rest, enforcement: audit, access: full }
+      - { host: groupssettings.googleapis.com, port: 443, protocol: rest, enforcement: audit, access: full }
+      - { host: keep.googleapis.com, port: 443, protocol: rest, enforcement: audit, access: full }
+      - { host: licensing.googleapis.com, port: 443, protocol: rest, enforcement: audit, access: full }
+      - { host: meet.googleapis.com, port: 443, protocol: rest, enforcement: audit, access: full }
+      - { host: people.googleapis.com, port: 443, protocol: rest, enforcement: audit, access: full }
+      - { host: pubsub.googleapis.com, port: 443, protocol: rest, enforcement: audit, access: full }
+      - { host: reseller.googleapis.com, port: 443, protocol: rest, enforcement: audit, access: full }
+      - { host: script.googleapis.com, port: 443, protocol: rest, enforcement: audit, access: full }
+      - { host: sheets.googleapis.com, port: 443, protocol: rest, enforcement: audit, access: full }
+      - { host: slides.googleapis.com, port: 443, protocol: rest, enforcement: audit, access: full }
+      - { host: storage.googleapis.com, port: 443, protocol: rest, enforcement: audit, access: full }
+      - { host: tasks.googleapis.com, port: 443, protocol: rest, enforcement: audit, access: full }
+      - { host: vault.googleapis.com, port: 443, protocol: rest, enforcement: audit, access: full }
+      - { host: workspaceevents.googleapis.com, port: 443, protocol: rest, enforcement: audit, access: full }
+      - { host: "**.rep.googleapis.com", port: 443, protocol: rest, enforcement: audit, access: full }
+
+    binaries:
+      - { path: /usr/local/bin/opencode }
+      - { path: /usr/bin/opencode }
+      - { path: /usr/lib/node_modules/opencode-ai/bin/opencode.exe }
+      - { path: /usr/lib/node_modules/opencode-ai/** }
+      - { path: /usr/local/bin/codex }
+      - { path: /usr/bin/codex }
+      - { path: /usr/lib/node_modules/@openai/** }
+      - { path: /usr/local/bin/claude }
+      - { path: /usr/bin/claude }
+      - { path: /usr/bin/node }
+      - { path: /usr/local/bin/gws }
+      - { path: /usr/local/lib/node_modules/@googleworkspace/** }
+      - { path: /usr/bin/git }
+      - { path: /usr/bin/gh }
+      - { path: /usr/bin/glab }
+      - { path: /usr/bin/oc }
+      - { path: /usr/bin/kubectl }
+      - { path: /usr/local/bin/kubectl }
+      - { path: /usr/bin/curl }
+      - { path: /usr/bin/uv }
+      - { path: /usr/bin/uvx }
+      - { path: /usr/local/bin/uv }
+      - { path: /usr/local/bin/uvx }
+      - { path: /usr/bin/python3* }
+      - { path: /usr/bin/rg }
+      - { path: /usr/bin/pre-commit }
+      - { path: /usr/local/bin/pre-commit }
+      - { path: /usr/bin/oras }
+      - { path: /usr/local/bin/oras }
+      - { path: /usr/bin/yq }
+      - { path: /usr/bin/tkn }
+      - { path: /usr/local/bin/tkn }
+      - { path: /usr/bin/kubectl-tkn }
+      - { path: /usr/local/bin/kubectl-tkn }

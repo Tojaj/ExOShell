@@ -1,0 +1,84 @@
+# Custom provider profile: GitHub CLI (read-write, no /graphql endpoint).
+#
+# Why this profile exists instead of the built-in `github`:
+#
+# The built-in `github` profile declares a /graphql endpoint for api.github.com
+# (protocol: graphql, access: read-only). OpenShell's Rego enforces GraphQL
+# allows as an *intersection*: request_denied_for_endpoint fires whenever any
+# matching endpoint has protocol: graphql and does not allow the operation. So
+# a user-policy overlay can only ever narrow the profile's /graphql endpoint,
+# never widen it. That makes it impossible to enable mutations (gh issue create,
+# gh pr create, etc.) via an overlay while keeping the profile intact.
+#
+# The fix is to declare /graphql exactly once, in the sandbox policy
+# (policy.yaml), where overlays can replace it wholesale. This profile
+# carries the REST endpoint and the github.com git rules only; it supplies the
+# credential binding that stamps GITHUB_TOKEN into every api.github.com:443
+# request regardless of which network_policies endpoint handles /graphql.
+#
+# See adrs/adr0001-graphql-endpoint-declared-once-in-user-policy.md.
+#
+# IMPORTANT: this profile MUST be used with a --policy file that includes a
+# github_graphql network policy (protocol: graphql) for api.github.com:443.
+# Without it, POST /graphql is parsed as REST, matched by the read-only REST
+# preset, and denied. policy.yaml carries that entry.
+id: github-cli
+display_name: GitHub (CLI, no /graphql endpoint)
+description: >-
+  GitHub API and git HTTPS. Credential binding only — /graphql is declared in
+  sandbox policy so overlays can control GraphQL mutation access on demand.
+  Requires a --policy file with a github_graphql network policy entry.
+category: source_control
+credentials:
+  - name: api_token
+    description: GitHub token
+    env_vars: [GITHUB_TOKEN, GH_TOKEN]
+    required: true
+    auth_style: bearer
+    header_name: authorization
+discovery:
+  credentials: [api_token]
+endpoints:
+  # REST API for api.github.com. read-only anchors the credential binding
+  # (CredentialedEndpointScope is host+ports only; /graphql requests inherit
+  # the token rewrite from this endpoint's scope, even though /graphql is not
+  # listed here). Access preset expands to GET/HEAD/OPTIONS — writes come from
+  # user policy or explicit gh api calls.
+  - host: api.github.com
+    port: 443
+    protocol: rest
+    access: read-only
+    enforcement: enforce
+  # github.com git transport: clone and fetch (git-upload-pack). Push
+  # (git-receive-pack) is not allowed here — use the github-push overlay and
+  # a token with Contents: Write.
+  - host: github.com
+    port: 443
+    protocol: rest
+    enforcement: enforce
+    rules:
+      - allow: { method: GET, path: "**" }
+      - allow: { method: HEAD, path: "**" }
+      - allow: { method: OPTIONS, path: "**" }
+      - allow: { method: POST, path: "/**/git-upload-pack" }
+binaries:
+  - /usr/bin/gh
+  - /usr/local/bin/gh
+  - /usr/bin/git
+  - /usr/local/bin/git
+  - /usr/lib/git-core/**
+  # Coding agents and general tools
+  - /usr/bin/codex
+  - /usr/local/bin/codex
+  - /usr/lib/node_modules/@openai/**
+  - /usr/local/bin/claude
+  - /usr/bin/claude
+  - /usr/local/bin/opencode
+  - /usr/bin/opencode
+  - /usr/lib/node_modules/opencode-ai/bin/opencode.exe
+  - /usr/lib/node_modules/opencode-ai/**
+  - /usr/local/bin/goose
+  - /usr/bin/goose
+  - /usr/local/bin/pi
+  - /usr/bin/pi
+  - /usr/bin/curl

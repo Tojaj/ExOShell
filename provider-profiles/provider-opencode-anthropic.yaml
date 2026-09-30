@@ -1,0 +1,27 @@
+# OpenCode with provider-backed Anthropic authentication.
+id: opencode-anthropic
+display_name: OpenCode (Anthropic)
+description: OpenCode agent CLI using Anthropic; inference bodies may contain opaque placeholders
+category: agent
+inference_capable: true
+credentials:
+  - name: api_key
+    description: Anthropic API key
+    env_vars: [ANTHROPIC_API_KEY]
+    required: true
+    auth_style: header
+    header_name: x-api-key
+discovery:
+  credentials: [api_key]
+endpoints:
+  - host: api.anthropic.com
+    port: 443
+    protocol: rest
+    access: read-write
+    enforcement: enforce
+    allow_uninspected_credentials: true
+binaries:
+  - /usr/bin/opencode
+  - /usr/local/bin/opencode
+  - /usr/lib/node_modules/opencode-ai/bin/opencode.exe
+  - /usr/lib/node_modules/opencode-ai/**

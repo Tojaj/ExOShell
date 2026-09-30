@@ -1,0 +1,27 @@
+# OpenCode with provider-backed OpenRouter authentication.
+id: opencode-openrouter
+display_name: OpenCode (OpenRouter)
+description: OpenCode agent CLI using OpenRouter; inference bodies may contain opaque placeholders
+category: agent
+inference_capable: true
+credentials:
+  - name: api_key
+    description: OpenRouter API key
+    env_vars: [OPENROUTER_API_KEY]
+    required: true
+    auth_style: bearer
+    header_name: authorization
+discovery:
+  credentials: [api_key]
+endpoints:
+  - host: openrouter.ai
+    port: 443
+    protocol: rest
+    access: read-write
+    enforcement: enforce
+    allow_uninspected_credentials: true
+binaries:
+  - /usr/bin/opencode
+  - /usr/local/bin/opencode
+  - /usr/lib/node_modules/opencode-ai/bin/opencode.exe
+  - /usr/lib/node_modules/opencode-ai/**

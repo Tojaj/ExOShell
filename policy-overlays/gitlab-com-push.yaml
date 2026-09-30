@@ -1,0 +1,24 @@
+# Overlay: allow git push over HTTPS to GitLab.com.
+#
+# This is deliberately separate from gitlab-com-issues-mrs.yaml: branch writes
+# are broader than issue and merge-request authorship.
+#
+# Apply:
+#   ./policy-overlays/apply.py --sandbox <sandbox-name> gitlab-com-push.yaml
+# Revoke:
+#   ./policy-overlays/apply.py --sandbox <sandbox-name> --revert
+network_policies:
+  gitlab_com_push:
+    name: gitlab-com-push
+    endpoints:
+      - host: gitlab.com
+        port: 443
+        protocol: rest
+        enforcement: enforce
+        allow_encoded_slash: true
+        rules:
+          - allow: { method: POST, path: "/**/git-receive-pack" }
+    binaries:
+      - { path: /usr/bin/git }
+      - { path: /usr/local/bin/git }
+      - { path: /usr/lib/git-core/** }

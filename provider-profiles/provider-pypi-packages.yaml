@@ -1,0 +1,43 @@
+# Anonymous PyPI package indexes and artifacts only (no interpreter installers
+# or Git sources). Python in the image resolves into uv's managed interpreter.
+id: pypi-packages
+display_name: PyPI packages
+description: Python package metadata and downloads from the official PyPI hosts
+category: data
+endpoints:
+  - host: pypi.org
+    port: 443
+    protocol: rest
+    access: read-only
+    enforcement: enforce
+  - host: files.pythonhosted.org
+    port: 443
+    protocol: rest
+    access: read-only
+    enforcement: enforce
+binaries:
+  - /usr/local/bin/uv
+  - /usr/bin/uv
+  - /usr/local/bin/uvx
+  - /usr/bin/uvx
+  - /sandbox/.uv/python/**
+  - /sandbox/.venv/bin/python
+  - /sandbox/.venv/bin/python3
+  - /sandbox/.venv/bin/pip
+  - /sandbox/.venv/bin/pip3
+  - /usr/bin/python3*
+  - /usr/local/bin/python3*
+  - /usr/bin/pip
+  - /usr/bin/pip3
+  - /usr/local/bin/pip
+  - /usr/local/bin/pip3
+  - /usr/bin/codex
+  - /usr/local/bin/codex
+  - /usr/lib/node_modules/@openai/**
+  - /usr/bin/claude
+  - /usr/local/bin/claude
+  - /usr/bin/opencode
+  - /usr/local/bin/opencode
+  - /usr/lib/node_modules/opencode-ai/bin/opencode.exe
+  - /usr/lib/node_modules/opencode-ai/**
+  - /usr/bin/curl

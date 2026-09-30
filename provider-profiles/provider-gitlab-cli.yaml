@@ -1,0 +1,93 @@
+# Custom provider profile: GitLab CLI (gitlab.com instance).
+#
+# This profile follows the same pattern as github-cli: it carries REST + git
+# transport endpoints and credential binding, but omits the /api/graphql
+# endpoint. The GraphQL endpoint is declared in user policy (policy.yaml)
+# so overlays can control GraphQL mutation access on demand.
+#
+# Why /api/graphql is omitted:
+#
+# OpenShell enforces GraphQL allows as an *intersection*: any matching endpoint
+# with protocol: graphql fires request_denied_for_endpoint if it does not allow
+# the operation. A second /api/graphql entry (from a user-policy overlay) can
+# only narrow the provider's entry, never widen it. Keeping /api/graphql in
+# user policy only, and replacing it wholesale via overlays, avoids this.
+#
+# Unlike GitHub, glab's issue and MR commands use REST (go-gitlab client), not
+# GraphQL. GraphQL is used only by `glab api graphql` and `glab workitems list`.
+# So the immediate impact of omitting /api/graphql is limited to work items and
+# explicit GraphQL API calls — `glab auth status` and `glab issue create` work
+# fine over REST without a GraphQL endpoint.
+#
+# Multi-instance note: host is baked into the profile and cannot be
+# parameterised at provider-create time. Each GitLab host needs its own
+# profile YAML and profile ID. Each host also needs
+# its own /api/graphql entry in user policy under a distinct
+# network_policies key (e.g. gitlab_com_graphql, gitlab_otherhost_graphql).
+# GITLAB_TOKEN collides across these profiles — attach at most one GitLab
+# provider per sandbox.
+#
+# See adrs/adr0009-gitlab-provider-graphql-in-user-policy.md.
+#
+# IMPORTANT: this profile MUST be used with a --policy file that includes a
+# gitlab_com_graphql network policy (protocol: graphql) for gitlab.com:443.
+# Without it, POST /api/graphql is parsed as REST, matched by the read-only
+# REST preset, and denied.
+id: gitlab-cli
+display_name: GitLab (CLI, no /api/graphql endpoint)
+description: >-
+  GitLab API and git HTTPS for gitlab.com. Credential binding only —
+  /api/graphql is declared in sandbox policy so overlays can control GraphQL
+  mutation access on demand.
+  Requires a --policy file with a gitlab_com_graphql network policy entry.
+category: source_control
+credentials:
+  - name: api_token
+    description: GitLab token
+    env_vars: [GITLAB_TOKEN, GLAB_TOKEN]
+    required: true
+    auth_style: bearer
+    header_name: authorization
+discovery:
+  credentials: [api_token]
+endpoints:
+  # gitlab.com serves both the REST API (/api/v4/) and git transport on the
+  # same host:443. Since access and rules are mutually exclusive per endpoint,
+  # and we need POST for git-upload-pack (clone/fetch), use explicit rules.
+  # GET/HEAD/OPTIONS cover read-only REST. Writes come from user policy overlays.
+  #
+  # CredentialedEndpointScope is keyed on {host, ports} only — /api/graphql
+  # requests inherit the GITLAB_TOKEN rewrite from this endpoint's scope even
+  # though /api/graphql is not listed here.
+  - host: gitlab.com
+    port: 443
+    protocol: rest
+    enforcement: enforce
+    allow_encoded_slash: true
+    rules:
+      - allow: { method: GET, path: "**" }
+      - allow: { method: HEAD, path: "**" }
+      - allow: { method: OPTIONS, path: "**" }
+      # git clone/fetch (smart HTTP)
+      - allow: { method: POST, path: "/**/git-upload-pack" }
+binaries:
+  - /usr/bin/glab
+  - /usr/local/bin/glab
+  - /usr/bin/git
+  - /usr/local/bin/git
+  - /usr/lib/git-core/**
+  # Coding agents and general tools
+  - /usr/bin/codex
+  - /usr/local/bin/codex
+  - /usr/lib/node_modules/@openai/**
+  - /usr/local/bin/claude
+  - /usr/bin/claude
+  - /usr/local/bin/opencode
+  - /usr/bin/opencode
+  - /usr/lib/node_modules/opencode-ai/bin/opencode.exe
+  - /usr/lib/node_modules/opencode-ai/**
+  - /usr/local/bin/goose
+  - /usr/bin/goose
+  - /usr/local/bin/pi
+  - /usr/bin/pi
+  - /usr/bin/curl

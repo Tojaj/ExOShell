@@ -1,0 +1,32 @@
+# Anonymous npm registry access. npm's JavaScript launcher runs as node;
+# OpenShell matches the resolved executable and its ancestors, not argv[0].
+id: npm-registry
+display_name: npm registry (read and audit)
+description: npm package metadata, search, downloads and narrowly scoped audit requests
+category: data
+endpoints:
+  - host: registry.npmjs.org
+    port: 443
+    protocol: rest
+    enforcement: enforce
+    allow_encoded_slash: true
+    rules:
+      - allow: { method: GET, path: "**" }
+      - allow: { method: HEAD, path: "**" }
+      - allow: { method: OPTIONS, path: "**" }
+      - allow: { method: POST, path: "/-/npm/v1/security/advisories/bulk" }
+      - allow: { method: POST, path: "/-/npm/v1/security/audits/quick" }
+binaries:
+  - /usr/bin/node
+  - /usr/lib/node_modules/npm/bin/npm-cli.js
+  - /usr/lib/node_modules/npm/bin/npx-cli.js
+  - /usr/bin/codex
+  - /usr/local/bin/codex
+  - /usr/lib/node_modules/@openai/**
+  - /usr/bin/claude
+  - /usr/local/bin/claude
+  - /usr/bin/opencode
+  - /usr/local/bin/opencode
+  - /usr/lib/node_modules/opencode-ai/bin/opencode.exe
+  - /usr/lib/node_modules/opencode-ai/**
+  - /usr/bin/curl

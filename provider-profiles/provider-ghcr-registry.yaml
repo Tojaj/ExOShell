@@ -1,0 +1,36 @@
+# Anonymous GHCR reads for agents, OCI tools, and the base-image version checker.
+# Python may resolve to a uv-managed interpreter inside the sandbox.
+id: ghcr-registry
+display_name: GHCR registry (read-only)
+description: Public OCI image and artifact metadata and downloads from ghcr.io
+category: data
+endpoints:
+  - host: ghcr.io
+    port: 443
+    protocol: rest
+    access: read-only
+    enforcement: enforce
+  - host: pkg-containers.githubusercontent.com
+    port: 443
+    # Keep the selector more specific than the baseline githubusercontent audit rule.
+    path: "/**"
+    protocol: rest
+    access: read-only
+    enforcement: enforce
+binaries:
+  - /sandbox/.uv/python/**
+  - /usr/bin/python3*
+  - /usr/local/bin/python3*
+  - /usr/bin/codex
+  - /usr/local/bin/codex
+  - /usr/lib/node_modules/@openai/**
+  - /sandbox/.codex/packages/app-server-daemon/releases/*/bin/codex
+  - /usr/bin/claude
+  - /usr/local/bin/claude
+  - /usr/bin/opencode
+  - /usr/local/bin/opencode
+  - /usr/lib/node_modules/opencode-ai/bin/opencode.exe
+  - /usr/lib/node_modules/opencode-ai/**
+  - /usr/bin/curl
+  - /usr/bin/oras
+  - /usr/local/bin/oras

@@ -1,0 +1,58 @@
+# Google Workspace CLI — OAuth credentials with request body rewrite.
+#
+# Hides client_secret and refresh_token from the sandbox process. The agent
+# reads placeholder strings from a credentials file; the proxy substitutes
+# real values in the POST body at the OAuth token endpoints.
+#
+# See adrs/adr0002-gws-credentials-via-provider-body-rewrite.md.
+#
+# Provider instance creation (one-time, on the host):
+#
+#   openshell provider profile lint -f provider-profiles/provider-gws-oauth.yaml
+#   openshell provider profile import -f provider-profiles/provider-gws-oauth.yaml
+#
+#   GWS_CREDS=$(gws auth export --unmasked)
+#   openshell provider create --name gws-oauth --type gws-oauth \
+#     --credential "GWS_CLIENT_ID=$(echo "$GWS_CREDS" | jq -r .client_id)" \
+#     --credential "GWS_CLIENT_SECRET=$(echo "$GWS_CREDS" | jq -r .client_secret)" \
+#     --credential "GWS_REFRESH_TOKEN=$(echo "$GWS_CREDS" | jq -r .refresh_token)"
+id: gws-oauth
+display_name: Google Workspace CLI (OAuth)
+description: >-
+  OAuth credentials for gws CLI with request body rewrite on its token
+  endpoints. client_secret and refresh_token never enter the sandbox in
+  readable form.
+category: other
+credentials:
+  - name: gws_client_id
+    description: Google OAuth client ID
+    env_vars: [GWS_CLIENT_ID]
+    required: true
+  - name: gws_client_secret
+    description: Google OAuth client secret
+    env_vars: [GWS_CLIENT_SECRET]
+    required: true
+  - name: gws_refresh_token
+    description: Google OAuth refresh token
+    env_vars: [GWS_REFRESH_TOKEN]
+    required: true
+endpoints:
+  - host: oauth2.googleapis.com
+    port: 443
+    protocol: rest
+    access: read-write
+    enforcement: enforce
+    request_body_credential_rewrite: true
+  # yup-oauth2's authorized-user flow uses this token URL. Keep the
+  # exact path so it takes precedence over the policy's **.google.com audit rule.
+  - host: accounts.google.com
+    path: /o/oauth2/token
+    port: 443
+    protocol: rest
+    access: read-write
+    enforcement: enforce
+    request_body_credential_rewrite: true
+binaries:
+  - /usr/local/bin/gws
+  - /usr/lib/node_modules/@googleworkspace/**
+  - /usr/local/lib/node_modules/@googleworkspace/**

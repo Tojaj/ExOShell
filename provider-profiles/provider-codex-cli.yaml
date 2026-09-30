@@ -1,0 +1,49 @@
+# Custom Codex profile for API-key auth (not ChatGPT OAuth).
+#
+# Built-in `codex` injects CODEX_AUTH_* and cannot set this flag.
+# Codex POSTs conversation text to api.openai.com; that JSON often includes
+# other providers' placeholders (e.g. `gh auth status`). Body rewrite would
+# send the real GitHub token to OpenAI. allow_uninspected_credentials forwards
+# the opaque placeholder instead. Header rewrite for OPENAI_API_KEY is unchanged.
+id: codex-cli
+display_name: Codex CLI
+description: OpenAI Codex CLI with API-key auth; conversation hosts may forward unresolved placeholders
+category: agent
+inference_capable: true
+credentials:
+  - name: api_key
+    description: OpenAI API key
+    env_vars: [OPENAI_API_KEY]
+    required: true
+    auth_style: bearer
+    header_name: authorization
+discovery:
+  credentials: [api_key]
+endpoints:
+  - host: api.openai.com
+    port: 443
+    protocol: rest
+    access: read-write
+    enforcement: enforce
+    allow_uninspected_credentials: true
+  - host: auth.openai.com
+    port: 443
+    protocol: rest
+    access: read-write
+    enforcement: enforce
+  - host: chatgpt.com
+    port: 443
+    protocol: rest
+    access: read-write
+    enforcement: enforce
+    allow_uninspected_credentials: true
+  - host: ab.chatgpt.com
+    port: 443
+    protocol: rest
+    access: read-write
+    enforcement: enforce
+    allow_uninspected_credentials: true
+binaries:
+  - /usr/bin/codex
+  - /usr/local/bin/codex
+  - /usr/lib/node_modules/@openai/**

@@ -1,0 +1,57 @@
+# Overlay: GitLab.com issue and merge-request authorship for `glab`.
+#
+# This replaces the complete gitlab_com_graphql entry, retaining its read-only
+# GraphQL access. glab issue and mr commands use REST, so the narrow REST rules
+# below grant the write capability. Explicit GraphQL mutations remain denied.
+#
+# Grants:
+#   glab issue create / update / close / reopen / note
+#   glab mr create / update / close / reopen / note
+#   glab api calls matching the same REST paths
+#
+# Does not grant git push (use gitlab-com-push.yaml), DELETE requests, merge or
+# approval actions, or GraphQL mutations.
+#
+# Apply:
+#   ./policy-overlays/apply.py --sandbox <sandbox-name> gitlab-com-issues-mrs.yaml
+# Combine with push:
+#   ./policy-overlays/apply.py --sandbox <sandbox-name> gitlab-com-issues-mrs.yaml gitlab-com-push.yaml
+# Revoke:
+#   ./policy-overlays/apply.py --sandbox <sandbox-name> --revert
+network_policies:
+  # Whole-entry replacement: do not rely on fields from policy.yaml.
+  gitlab_com_graphql:
+    name: gitlab-com-graphql
+    endpoints:
+      - host: gitlab.com
+        port: 443
+        path: /api/graphql
+        protocol: graphql
+        access: read-only
+        enforcement: enforce
+    binaries:
+      - { path: /usr/bin/glab }
+      - { path: /usr/local/bin/glab }
+
+  gitlab_com_issues_mrs:
+    name: gitlab-com-issues-mrs
+    endpoints:
+      - host: gitlab.com
+        port: 443
+        protocol: rest
+        enforcement: enforce
+        allow_encoded_slash: true
+        rules:
+          # Issues: create, edit, close, and reopen.
+          - allow: { method: POST, path: "/api/v4/projects/*/issues" }
+          - allow: { method: PUT, path: "/api/v4/projects/*/issues/*" }
+          # Issue notes: create.
+          - allow: { method: POST, path: "/api/v4/projects/*/issues/*/notes" }
+          # Merge requests: create, edit, close, and reopen.
+          - allow: { method: POST, path: "/api/v4/projects/*/merge_requests" }
+          - allow: { method: PUT, path: "/api/v4/projects/*/merge_requests/*" }
+          # Merge-request notes: create.
+          - allow: { method: POST, path: "/api/v4/projects/*/merge_requests/*/notes" }
+    binaries:
+      - { path: /usr/bin/glab }
+      - { path: /usr/local/bin/glab }

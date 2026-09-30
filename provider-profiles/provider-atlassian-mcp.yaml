@@ -1,0 +1,40 @@
+# Atlassian Rovo MCP with an OAuth 2.1 access token.
+#
+# The credential is a short-lived (~1h) Bearer access token obtained and stored
+# directly in the provider by scripts/atlassian-mcp-oauth.sh. OpenCode sends it in the
+# Authorization header and OpenShell replaces the placeholder only for the
+# bound Atlassian MCP endpoint.
+#
+# See adrs/adr0017-atlassian-mcp-oauth-bearer.md.
+#
+# Provider instance creation (on the host):
+#
+#   openshell provider profile lint -f provider-profiles/provider-atlassian-mcp.yaml
+#   openshell provider profile import -f provider-profiles/provider-atlassian-mcp.yaml
+#
+#   ./scripts/atlassian-mcp-oauth.sh sync
+id: atlassian-mcp
+display_name: Atlassian Rovo MCP
+description: Atlassian Rovo MCP access using an OAuth 2.1 Bearer token
+category: knowledge
+credentials:
+  - name: bearer_token
+    description: OAuth 2.1 access token for Atlassian MCP
+    env_vars: [ATLASSIAN_MCP_BEARER_TOKEN]
+    required: true
+    auth_style: bearer
+    header_name: Authorization
+discovery:
+  credentials: [bearer_token]
+endpoints:
+  - host: mcp.atlassian.com
+    port: 443
+    path: /v2/mcp
+    protocol: rest
+    access: read-write
+    enforcement: enforce
+binaries:
+  - /usr/bin/opencode
+  - /usr/local/bin/opencode
+  - /usr/lib/node_modules/opencode-ai/bin/opencode.exe
+  - /usr/lib/node_modules/opencode-ai/**

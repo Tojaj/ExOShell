@@ -1,0 +1,24 @@
+# System-wide, non-secret defaults for Codex in this image.
+#
+# Codex loads the installed copy at /etc/codex/config.toml below command-line,
+# project, profile, user, and cloud-managed configuration. Keep credentials
+# and machine-specific settings out of this file.
+
+model_reasoning_effort = "high"
+sandbox_mode = "danger-full-access"
+approval_policy = "on-request"
+
+[mcp_servers.atlassian]
+url = "https://mcp.atlassian.com/v2/mcp"
+bearer_token_env_var = "ATLASSIAN_MCP_BEARER_TOKEN"
+
+[tui]
+status_line_use_colors = true
+status_line = [
+  "model-with-reasoning",
+  "current-dir",
+  "git-branch",
+  "context-remaining",
+  "context-window-size",
+  "used-tokens",
+]

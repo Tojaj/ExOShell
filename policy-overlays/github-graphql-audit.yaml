@@ -1,0 +1,39 @@
+# Overlay: switch the GitHub GraphQL endpoint to audit mode.
+#
+# Purpose: debugging tool, not a production overlay. Apply it when a `gh`
+# command is blocked with "GraphQL operation blocked by endpoint policy". The
+# sandbox logs will then show the exact operation name (operation_type and
+# root field) — add that field to github-issues-prs.yaml and re-apply.
+#
+# This replaces the complete github_graphql entry. Every required field is
+# repeated here rather than inherited from the baseline.
+#
+# Legal to combine with github-issues-prs.yaml's REST block:
+#   ./policy-overlays/apply.py --sandbox <sandbox-name> --revert github-graphql-audit.yaml
+#   # run the blocked gh command, read openshell logs <sandbox-name>
+#   ./policy-overlays/apply.py --sandbox <sandbox-name> github-issues-prs.yaml
+#
+# Why audit is safe here while it would be rejected on the REST endpoint:
+# The /graphql endpoint has path specificity 8 (length of non-* chars in
+# "/graphql"), while the profile's path-less REST endpoint has specificity 0.
+# ambiguity.rs:88-97 only compares protocol/enforcement when specificities
+# are equal, so enforcement: audit here does not conflict with the profile's
+# enforcement: enforce on the REST endpoint.
+#
+# Apply:
+#   ./policy-overlays/apply.py --sandbox <sandbox-name> --revert github-graphql-audit.yaml
+# Revoke (restore read-only baseline):
+#   ./policy-overlays/apply.py --sandbox <sandbox-name> --revert
+network_policies:
+  github_graphql:
+    name: github-graphql-audit
+    endpoints:
+      - host: api.github.com
+        port: 443
+        path: /graphql
+        protocol: graphql
+        access: full
+        enforcement: audit
+    binaries:
+      - { path: /usr/bin/gh }
+      - { path: /usr/local/bin/gh }

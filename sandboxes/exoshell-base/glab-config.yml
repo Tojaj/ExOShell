@@ -1,0 +1,4 @@
+hosts:
+  gitlab.com:
+    git_protocol: https
+    api_protocol: https

@@ -1,0 +1,34 @@
+# Overlay: allow git push over HTTPS to github.com.
+#
+# This is off by default. Apply it when you need `git push` to GitHub.
+#
+# Required separately from github-issues-prs.yaml because push is a much
+# broader grant than issue/PR authorship: once the proxy allows git-receive-pack,
+# the sandbox can modify any branch the token allows.
+#
+# OpenShell allowing the POST is necessary but not sufficient. git push also
+# needs Contents: Write on a fine-grained token. A token with only Contents:
+# Read will cause GitHub to reject the push even when OpenShell permits it.
+#
+# Apply:
+#   ./policy-overlays/apply.py --sandbox <sandbox-name> github-push.yaml
+# or combine with issues/PRs:
+#   ./policy-overlays/apply.py --sandbox <sandbox-name> github-issues-prs.yaml github-push.yaml
+# Revoke:
+#   ./policy-overlays/apply.py --sandbox <sandbox-name> --revert
+network_policies:
+  github_push:
+    name: github-push
+    endpoints:
+      - host: github.com
+        port: 443
+        protocol: rest
+        enforcement: enforce
+        rules:
+          - allow: { method: POST, path: "/**/git-receive-pack" }
+    binaries:
+      - { path: /usr/bin/git }
+      - { path: /usr/local/bin/git }
+      - { path: /usr/lib/git-core/** }
+      - { path: /usr/bin/gh }
+      - { path: /usr/local/bin/gh }
