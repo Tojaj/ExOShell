@@ -15,6 +15,9 @@ Use upstream documentation and source to verify OpenShell behavior:
 - https://docs.nvidia.com/openshell/reference/sandbox-compute-drivers
 - https://docs.nvidia.com/openshell/reference/policy-schema
 - https://github.com/NVIDIA/OpenShell
+- https://github.com/NVIDIA/OpenShell-Community
+
+Load `./AGENTS.local.md` if available for local specific guidance.
 
 ## Design and publication
 
