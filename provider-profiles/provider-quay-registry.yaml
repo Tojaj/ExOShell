@@ -1,0 +1,66 @@
+# Anonymous Quay.io reads for agents and OCI tools.
+# Python may resolve to a uv-managed interpreter inside the sandbox.
+id: quay-registry
+display_name: Quay.io registry (read-only)
+description: Public OCI image and artifact metadata and downloads from quay.io
+category: data
+endpoints:
+  - host: quay.io
+    port: 443
+    protocol: rest
+    access: read-only
+    enforcement: enforce
+  - host: cdn.quay.io
+    port: 443
+    protocol: rest
+    access: read-only
+    enforcement: enforce
+  - host: cdn01.quay.io
+    port: 443
+    protocol: rest
+    access: read-only
+    enforcement: enforce
+  - host: cdn02.quay.io
+    port: 443
+    protocol: rest
+    access: read-only
+    enforcement: enforce
+  - host: cdn03.quay.io
+    port: 443
+    protocol: rest
+    access: read-only
+    enforcement: enforce
+  - host: cdn04.quay.io
+    port: 443
+    protocol: rest
+    access: read-only
+    enforcement: enforce
+  - host: cdn05.quay.io
+    port: 443
+    protocol: rest
+    access: read-only
+    enforcement: enforce
+  - host: cdn06.quay.io
+    port: 443
+    protocol: rest
+    access: read-only
+    enforcement: enforce
+binaries:
+  - /sandbox/.uv/python/**
+  - /usr/bin/python3*
+  - /usr/local/bin/python3*
+  - /usr/bin/codex
+  - /usr/local/bin/codex
+  - /usr/lib/node_modules/@openai/**
+  - /sandbox/.codex/packages/app-server-daemon/releases/*/bin/codex
+  - /usr/bin/claude
+  - /usr/local/bin/claude
+  - /usr/bin/opencode
+  - /usr/local/bin/opencode
+  - /usr/lib/node_modules/opencode-ai/bin/opencode.exe
+  - /usr/lib/node_modules/opencode-ai/**
+  - /usr/bin/curl
+  - /usr/bin/oras
+  - /usr/local/bin/oras
+  - /usr/bin/skopeo
+  - /usr/local/bin/skopeo

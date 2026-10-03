@@ -34,12 +34,13 @@ ARG AST_GREP_VERSION=0.45.3
 
 ENV DEBIAN_FRONTEND=noninteractive
 
-# Search and JSON tools via apt. Debian names the fd binary fdfind, so add
-# the customary fd command. curl/ca-certificates/git/node/uv are in `base`.
+# Search, JSON, and registry tools via apt. Debian names the fd binary fdfind,
+# so add the customary fd command. curl/ca-certificates/git/node/uv are in `base`.
 RUN apt-get update && apt-get install -y --no-install-recommends \
         fd-find \
         jq \
         ripgrep \
+        skopeo \
     && rm -rf /var/lib/apt/lists/* \
     && ln -sfn /usr/bin/fdfind /usr/local/bin/fd
 

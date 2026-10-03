@@ -7,7 +7,7 @@ instances needed on a machine.
 
 ## Opt-in package registries
 
-Five independent, credential-free profiles grant package or container image
+Seven independent, credential-free profiles grant package or container image
 downloads and metadata lookups over HTTPS. None is attached by default or grants
 publishing access:
 
@@ -17,9 +17,11 @@ publishing access:
 | `pypi-packages` | `pypi.org`, `files.pythonhosted.org` | pip/uv indexes, metadata and downloads |
 | `go-modules` | `proxy.golang.org`, `sum.golang.org` | Go proxy resolution and checksum verification |
 | `cargo-crates` | `index.crates.io`, `static.crates.io`, `crates.io` | Cargo index, downloads, search and metadata |
-| `ghcr-registry` | `ghcr.io`, `pkg-containers.githubusercontent.com` | Public OCI image and artifact reads by agents, `curl`, `oras`, and Python tools |
+| `ghcr-registry` | `ghcr.io`, `pkg-containers.githubusercontent.com` | Public OCI image and artifact reads by agents, `curl`, `oras`, `skopeo`, and Python tools |
+| `dockerhub-registry` | `registry-1.docker.io`, `auth.docker.io`, `production.cloudfront.docker.com`, `docker-images-prod.6aa30f8b08e16409b46e0173d6de2f56.r2.cloudflarestorage.com` | Public OCI image and artifact reads by agents, `curl`, `oras`, `skopeo`, and Python tools |
+| `quay-registry` | `quay.io`, `cdn.quay.io`, `cdn01.quay.io` through `cdn06.quay.io` | Public OCI image and artifact reads by agents, `curl`, `oras`, `skopeo`, and Python tools |
 
-All five allow GET/HEAD/OPTIONS; npm alone also allows POST to
+All seven allow GET/HEAD/OPTIONS; npm alone also allows POST to
 `/-/npm/v1/security/advisories/bulk` and `/-/npm/v1/security/audits/quick`.
 Publishing, login, and unrelated POST/PUT/PATCH/DELETE requests are not granted.
 
@@ -36,18 +38,72 @@ These profiles require no credentials. Do not supply a dummy credential,
 `--runtime-credentials`, or `--from-existing` for them.
 
 Use the corresponding `provider-<name>.yaml` and `--name <name> --type <name>`
-for `pypi-packages`, `go-modules`, `cargo-crates`, and `ghcr-registry`. These
-profiles have no credential discovery. They compose with an agent's inference
-provider; their names select provider *instances*, not profile files.
+for `pypi-packages`, `go-modules`, `cargo-crates`, and `ghcr-registry`. For the
+two additional container registries:
 
-The `ghcr-registry` profile permits agents, `curl`, `oras`, and Python to read
-public GHCR tokens, image manifests, and artifacts. GHCR may redirect blob
+```bash
+openshell provider profile lint -f provider-profiles/provider-dockerhub-registry.yaml
+openshell provider profile import -f provider-profiles/provider-dockerhub-registry.yaml
+openshell provider create --name dockerhub-registry --type dockerhub-registry
+
+openshell provider profile lint -f provider-profiles/provider-quay-registry.yaml
+openshell provider profile import -f provider-profiles/provider-quay-registry.yaml
+openshell provider create --name quay-registry --type quay-registry
+```
+
+These profiles have no credential discovery. They compose with an agent's
+inference provider; their names select provider *instances*, not profile files.
+
+The `ghcr-registry` profile permits agents, `curl`, `oras`, `skopeo`, and Python
+to read public GHCR tokens, image manifests, and artifacts. GHCR may redirect blob
 downloads to `pkg-containers.githubusercontent.com`. Attach it when running the
 base-image version checker inside an OpenShell sandbox; that checker validates
 the pinned `uv` source image on GHCR. The profile does not govern image pulls
 by the host's container engine. OCI repository names use ordinary slashes in
 request paths, so this profile does not enable `allow_encoded_slash`; the
 checker's encoded slash is in a token-request query parameter.
+
+The `dockerhub-registry` profile permits anonymous token requests to
+`auth.docker.io` and image reads from `registry-1.docker.io`, including redirects
+to Docker's CloudFront and Cloudflare R2 download hosts. See the
+[Docker allowlist](https://docs.docker.com/desktop/enterprise/allow-list/) and
+[Docker maintainer confirmation of the R2 host](https://github.com/docker/docs/issues/21960).
+The `quay-registry` profile covers `quay.io` (including its anonymous token
+endpoint) and the seven exact CDN hosts listed in the
+[upstream firewall documentation](https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html/installation_configuration/configuring-firewall).
+Both profiles use ordinary slashes in repository paths and leave
+`allow_encoded_slash` disabled. Encoded slashes in token and signed-download
+query parameters do not require that setting.
+
+All three container registry profiles support the same clients and require no
+login. They grant public metadata, manifests, configuration blobs, and image
+layers; private image authentication is not configured. Docker Hub's anonymous
+pull limits still apply. These grants control requests made inside the sandbox,
+not image pulls made by the host or gateway container engine.
+
+The base image supplies Skopeo through its distribution package. After rebuilding
+the base and derived image layers, inspect a public image in a sandbox with the
+matching provider attached:
+
+```bash
+# dockerhub-registry
+skopeo inspect docker://docker.io/library/alpine:latest
+oras manifest fetch docker.io/library/alpine:latest
+
+# quay-registry
+skopeo inspect docker://quay.io/prometheus/busybox:latest
+oras manifest fetch quay.io/prometheus/busybox:latest
+
+# ghcr-registry
+skopeo inspect docker://ghcr.io/astral-sh/uv:0.12.22
+```
+
+To verify layer downloads and CDN redirects, copy one of those images to a
+writable local OCI layout, for example:
+
+```bash
+skopeo copy docker://docker.io/library/alpine:latest oci:/tmp/alpine-smoke:latest
+```
 
 For repeat use, add the selected instance names to the common `providers`
 array in `.exoshell.local.toml` so Codex, Claude Code, and OpenCode all get
@@ -56,7 +112,7 @@ the inference provider: CLI options replace the complete configured list.
 
 ```bash
 ./run-exoshell-agent.sh --agent codex \
-  --provider codex --provider npm-registry --provider pypi-packages \
+  --provider codex --provider dockerhub-registry --provider quay-registry \
   . -- exec 'reply with OK'
 ```
 

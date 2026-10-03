@@ -86,6 +86,8 @@ The image includes these command-line tools:
 - `jq` — JSON querying and transformation.
 - `pre-commit` — run repository commit hooks.
 - `oras` — work with OCI registry artifacts.
+- `skopeo` — inspect remote container images and copy them to local storage
+  without a container daemon.
 - `yq` — query and edit YAML files.
 - `tkn` — inspect and run Tekton pipelines and tasks.
 
@@ -93,6 +95,10 @@ Package installation and downloads require an attached
 [package registry provider](../../providers.md#opt-in-package-registries).
 In particular, `uvx` cannot fetch Python MCP dependencies from PyPI without
 the `pypi-packages` provider. Go and Cargo are not installed in this image.
+Public image inspection and downloads with `skopeo` or `oras` require the
+matching `ghcr-registry`, `dockerhub-registry`, or `quay-registry` provider.
+Skopeo uses the distribution package version. Rebuild the base and derived
+image layers to add it to existing installations.
 
 Pinned tool version build arguments live in `Dockerfile`. Non-secret Codex
 defaults are copied to `/etc/codex/config.toml`; OpenCode automatic updates are

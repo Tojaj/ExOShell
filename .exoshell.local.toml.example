@@ -7,7 +7,7 @@ agent = "codex"
 # GWS initialization is automatic when its provider credentials are available.
 providers = ["gh-personal", "gws-oauth"]
 # Optionally add only the package registries this project needs:
-# providers = ["gh-personal", "gws-oauth", "npm-registry", "pypi-packages", "ghcr-registry"]
+# providers = ["gh-personal", "gws-oauth", "npm-registry", "pypi-packages", "ghcr-registry", "dockerhub-registry", "quay-registry"]
 
 # Optional integrations are disabled when omitted.
 # policy = "policies/policy.yaml"

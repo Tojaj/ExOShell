@@ -1,19 +1,27 @@
-# Anonymous GHCR reads for agents, OCI tools, and the base-image version checker.
+# Anonymous Docker Hub reads for agents and OCI tools.
 # Python may resolve to a uv-managed interpreter inside the sandbox.
-id: ghcr-registry
-display_name: GHCR registry (read-only)
-description: Public OCI image and artifact metadata and downloads from ghcr.io
+id: dockerhub-registry
+display_name: Docker Hub registry (read-only)
+description: Public OCI image and artifact metadata and downloads from Docker Hub
 category: data
 endpoints:
-  - host: ghcr.io
+  - host: registry-1.docker.io
     port: 443
     protocol: rest
     access: read-only
     enforcement: enforce
-  - host: pkg-containers.githubusercontent.com
+  - host: auth.docker.io
     port: 443
-    # Keep the selector more specific than the baseline githubusercontent audit rule.
-    path: "/**"
+    protocol: rest
+    access: read-only
+    enforcement: enforce
+  - host: production.cloudfront.docker.com
+    port: 443
+    protocol: rest
+    access: read-only
+    enforcement: enforce
+  - host: docker-images-prod.6aa30f8b08e16409b46e0173d6de2f56.r2.cloudflarestorage.com
+    port: 443
     protocol: rest
     access: read-only
     enforcement: enforce
