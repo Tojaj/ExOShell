@@ -46,7 +46,8 @@ class ConfigTests(unittest.TestCase):
             "malformed": "image = [",
             "unknown": "surprise = true\n",
             "removed-sandbox-name": 'sandbox_name = "fixed"\n',
-            "type": "gws = 1\n",
+            "removed-gws-true": "gws = true\n",
+            "removed-gws-false": "gws = false\n",
             "agent": 'agent = "other"\n',
             "agent-type": "agent = []\n",
             "unknown-agent": "[agents.other]\nproviders = []\n",
@@ -131,6 +132,11 @@ class ResolutionTests(unittest.TestCase):
         with self.assertRaises(SystemExit):
             self.parse("--agent", "invalid")
 
+    def test_removed_gws_options_are_rejected(self) -> None:
+        for option in ("--gws", "--no-gws"):
+            with self.subTest(option=option), self.assertRaises(SystemExit):
+                self.parse(option)
+
     def test_github_host_cli_override_clearing_and_validation(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             cwd = Path(temporary)
@@ -200,7 +206,6 @@ class CommandTests(unittest.TestCase):
             "providers": [],
             "policy": None,
             "kubeconfig": None,
-            "gws": False,
             "github_host": None,
             "gitlab_host": None,
             "project": project,
@@ -218,7 +223,7 @@ class CommandTests(unittest.TestCase):
             with self.subTest(agent=agent), tempfile.TemporaryDirectory() as temporary:
                 settings = self.settings(Path(temporary), agent)
                 mounts = launcher.mount_config(settings)["podman"]["mounts"]
-                self.assertEqual([mount["target"] for mount in mounts], ["/workspace"])
+                self.assertEqual([mount["target"] for mount in mounts], ["/workspace", "/tmp/gws"])
                 command = launcher.create_command(
                     settings, ["--model", "model with spaces", "$(touch nope)"], "A User", "a@example.com"
                 )
@@ -244,14 +249,13 @@ class CommandTests(unittest.TestCase):
             command = launcher.create_command(settings, [], "A User", "a@example.com")
             self.assertNotIn("--no-keep", command)
 
-    def test_gws_credentials_remain_on_tmpfs(self) -> None:
+    def test_gws_tmpfs_is_provisioned_without_provider_or_opt_in(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             settings = self.settings(Path(temporary), "opencode")
-            settings["gws"] = True
             mounts = launcher.mount_config(settings)["podman"]["mounts"]
             self.assertEqual(mounts[-1], {"type": "tmpfs", "target": "/tmp/gws", "mode": 0o777})
             environment = launcher.environment_args(settings, "A User", "a@example.com")
-            self.assertIn("EXOSHELL_GWS=1", environment)
+            self.assertNotIn("EXOSHELL_GWS=1", environment)
             self.assertNotIn("GOOGLE_WORKSPACE_CLI_CREDENTIALS_FILE=/tmp/gws/credentials.json", environment)
 
     def test_github_and_gitlab_hosts_configure_cli_and_git(self) -> None:
@@ -353,7 +357,7 @@ class LauncherIntegrationTests(unittest.TestCase):
             mount_data = json.loads(driver.split("=", 1)[1])
             self.assertEqual(
                 [mount["target"] for mount in mount_data["podman"]["mounts"][1:]],
-                [],
+                ["/tmp/gws"],
             )
 
 
@@ -366,7 +370,6 @@ class ImageStartupTests(unittest.TestCase):
             project = Path(temporary) / "project with spaces"
             project.mkdir()
             environment = os.environ.copy()
-            environment.pop("EXOSHELL_GWS", None)
             for key in ("GWS_CLIENT_ID", "GWS_CLIENT_SECRET", "GWS_REFRESH_TOKEN"):
                 environment.pop(key, None)
             result = subprocess.run(
@@ -398,13 +401,13 @@ class ImageStartupTests(unittest.TestCase):
                     self.assertIn("PROJECT", result.stderr)
 
     @unittest.skipUnless(os.access("/workspace", os.W_OK), "writable /workspace is required")
-    def test_gws_opt_in_fails_before_running_command(self) -> None:
+    def test_partial_gws_environment_fails_before_running_command(self) -> None:
         with tempfile.TemporaryDirectory(dir="/workspace") as temporary:
             marker = Path(temporary) / "started"
             environment = os.environ.copy()
-            environment["EXOSHELL_GWS"] = "1"
             for key in ("GWS_CLIENT_ID", "GWS_CLIENT_SECRET", "GWS_REFRESH_TOKEN"):
                 environment.pop(key, None)
+            environment["GWS_REFRESH_TOKEN"] = "sensitive-value"
             result = subprocess.run(
                 [str(self.HELPER), temporary, "--", sys.executable, "-c",
                  "from pathlib import Path; import sys; Path(sys.argv[1]).touch()", str(marker)],
@@ -412,7 +415,43 @@ class ImageStartupTests(unittest.TestCase):
             )
             self.assertEqual(result.returncode, 2)
             self.assertIn("GWS_CLIENT_ID", result.stderr)
+            self.assertNotIn("sensitive-value", result.stderr)
             self.assertFalse(marker.exists())
+
+    def test_absent_or_empty_gws_values_skip_without_storage_or_environment_changes(self) -> None:
+        initialize_gws = runpy.run_path(str(self.HELPER))["initialize_gws"]
+        for credentials in ({}, dict.fromkeys(("GWS_CLIENT_ID", "GWS_CLIENT_SECRET", "GWS_REFRESH_TOKEN"), "")):
+            with self.subTest(credentials=credentials), tempfile.TemporaryDirectory() as temporary:
+                directory = Path(temporary) / "missing"
+                environment = {**credentials, "GOOGLE_WORKSPACE_CLI_CONFIG_DIR": "/custom/config"}
+                expected = environment.copy()
+                initialize_gws(environment, directory)
+                self.assertFalse(directory.exists())
+                self.assertEqual(environment, expected)
+
+    @unittest.skipUnless(os.access("/workspace", os.W_OK), "writable /workspace is required")
+    def test_complete_gws_environment_initializes_before_exec_without_opt_in(self) -> None:
+        startup = runpy.run_path(str(self.HELPER))
+        main = startup["main"]
+        initialize_gws = startup["initialize_gws"]
+        with tempfile.TemporaryDirectory(dir="/workspace") as temporary:
+            project = Path(temporary).resolve()
+            directory = project / "gws"
+            directory.mkdir()
+            environment = {key: f"openshell:resolve:env:{key}" for key in startup["GWS_KEYS"]}
+            with mock.patch.dict(os.environ, environment, clear=True), \
+                 mock.patch.dict(main.__globals__, {"initialize_gws": lambda env: initialize_gws(env, directory)}), \
+                 mock.patch("os.chdir") as chdir, mock.patch("os.execvpe") as execute:
+                main([str(project), "--", "/bin/true", "argument with spaces"])
+            chdir.assert_called_once_with(project)
+            command, arguments, child_environment = execute.call_args.args
+            self.assertEqual(command, "/bin/true")
+            self.assertEqual(arguments, ["/bin/true", "argument with spaces"])
+            self.assertEqual(child_environment["GOOGLE_WORKSPACE_CLI_CREDENTIALS_FILE"],
+                             str(directory / "credentials.json"))
+            self.assertEqual(child_environment["GOOGLE_WORKSPACE_CLI_CONFIG_DIR"], str(directory / "config"))
+            self.assertEqual(json.loads((directory / "credentials.json").read_text())["refresh_token"],
+                             environment["GWS_REFRESH_TOKEN"])
 
     def test_gws_credentials_are_valid_private_json(self) -> None:
         initialize_gws = runpy.run_path(str(self.HELPER))["initialize_gws"]

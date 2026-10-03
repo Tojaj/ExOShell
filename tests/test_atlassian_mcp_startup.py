@@ -119,7 +119,8 @@ class AtlassianStartupTests(unittest.TestCase):
             executable.chmod(0o755)
             environment = os.environ.copy()
             environment.pop(KEY, None)
-            environment.pop("EXOSHELL_GWS", None)
+            for key in ("GWS_CLIENT_ID", "GWS_CLIENT_SECRET", "GWS_REFRESH_TOKEN"):
+                environment.pop(key, None)
             environment.pop("OPENCODE_CONFIG_CONTENT", None)
             result = subprocess.run([str(IMAGE / "exoshell-agent"), temporary, "--", str(executable),
                                      "prompt with spaces", "$(syntax)"], env=environment,

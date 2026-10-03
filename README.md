@@ -180,8 +180,15 @@ openshell sandbox list --selector managed-by=exoshell,project=exoshell -o json
 The default `sandbox list` table does not show labels; use a selector or JSON
 or YAML output to inspect them. CLI `--provider` options replace the complete
 common-plus-agent list; `--no-providers` clears it. Other settings can be
-cleared with `--no-policy`, `--no-kubeconfig`, `--no-gws`, or
+cleared with `--no-policy`, `--no-kubeconfig`, or
 `--no-github-host` or `--no-gitlab-host`.
+
+GWS initialization is automatic when an attached provider supplies non-empty
+`GWS_CLIENT_ID`, `GWS_CLIENT_SECRET`, and `GWS_REFRESH_TOKEN` values. Remove
+the former `gws` key from local TOML files and `--gws`/`--no-gws` from launcher
+commands; these options are no longer accepted. Omit the GWS provider to skip
+provider-backed initialization. The launcher always mounts `/tmp/gws` as tmpfs
+so a provider can also be attached later, followed by a fresh helper launch.
 
 Do not attach inference providers that export the same variable to one
 sandbox—for example the Codex OpenAI and OpenCode OpenAI profiles both export

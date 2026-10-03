@@ -1,5 +1,6 @@
 ---
-status: accepted
+status: superseded
+superseded-by: adr0030-provider-controlled-agent-integrations.md
 date: 2026-09-27
 author: Tomas Mlcoch
 topics:
@@ -8,6 +9,10 @@ topics:
 ---
 
 # 23. Put shared startup behavior in an ExOShell image executable
+
+Superseded by [ADR-0030](adr0030-provider-controlled-agent-integrations.md),
+which preserves the image executable contract and replaces explicit GWS opt-in
+with provider-controlled initialization.
 
 ## Context
 

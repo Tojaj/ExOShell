@@ -105,6 +105,9 @@ def initialize_atlassian_mcp(command: list[str], environment: dict[str, str], pr
 
 
 def initialize_gws(environment: dict[str, str], directory: Path = GWS_DIR) -> None:
+    """Initialize from provider credentials; a partial environment is an error."""
+    if not any(environment.get(key) for key in GWS_KEYS):
+        return
     missing = [key for key in GWS_KEYS if not environment.get(key)]
     if missing:
         fail(f"GWS requires non-empty environment values: {', '.join(missing)}")
@@ -162,8 +165,7 @@ def main(arguments: list[str]) -> None:
 
     environment = os.environ.copy()
     command = initialize_atlassian_mcp(arguments[2:], environment, project)
-    if environment.get("EXOSHELL_GWS") == "1":
-        initialize_gws(environment)
+    initialize_gws(environment)
     try:
         os.chdir(project)
     except OSError:

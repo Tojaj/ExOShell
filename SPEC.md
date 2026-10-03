@@ -74,8 +74,12 @@ selected baseline. PyYAML is required by `policy-overlays/apply.py`.
 
 A kubeconfig can be mounted read-only; its credentials remain readable inside
 the sandbox. Google Workspace initialization instead writes provider-backed
-placeholders to a private credentials file in tmpfs. Public package registries
-and Atlassian MCP access are opt-in provider integrations.
+placeholders to a private credentials file in tmpfs. The launcher always
+mounts `/tmp/gws` as tmpfs. The image helper initializes GWS only when
+`GWS_CLIENT_ID`, `GWS_CLIENT_SECRET`, and `GWS_REFRESH_TOKEN` are all non-empty;
+it skips initialization when none are non-empty and fails before starting the
+command when only some are present. GWS has no separate launcher opt-in.
+Public package registries and Atlassian MCP access are opt-in provider integrations.
 
 Atlassian MCP defaults to disabled. At agent startup, the image helper enables
 the built-in entry only when the provider-backed `ATLASSIAN_MCP_BEARER_TOKEN`

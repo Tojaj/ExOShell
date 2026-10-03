@@ -35,7 +35,6 @@ DEFAULTS: dict[str, Any] = {
     "providers": [],
     "policy": None,
     "kubeconfig": None,
-    "gws": False,
     "github_host": None,
     "gitlab_host": None,
     "keep": False,
@@ -73,10 +72,6 @@ def parser(*, prog: str = "run-exoshell-agent.sh") -> argparse.ArgumentParser:
     providers.add_argument("--no-providers", action="store_true")
     _nullable_path_option(result, "policy", "sandbox policy YAML")
     _nullable_path_option(result, "kubeconfig", "kubeconfig file")
-    gws = result.add_mutually_exclusive_group()
-    gws.add_argument("--gws", dest="gws", action="store_true", help="enable GWS placeholder initialization")
-    gws.add_argument("--no-gws", dest="gws", action="store_false", help="disable GWS integration")
-    gws.set_defaults(gws=None)
     _nullable_host_option(result, "github", "GitHub")
     _nullable_host_option(result, "gitlab", "GitLab")
     result.add_argument("project", nargs="?", type=Path, help="project directory (default: current directory)")
@@ -155,9 +150,6 @@ def load_config(path: Path, *, required: bool) -> dict[str, Any]:
         elif key == "agent":
             if type(value) is not str or value not in AGENTS:
                 raise LauncherError(f"configuration key 'agent' must be one of: {', '.join(AGENTS)}")
-        elif key == "gws":
-            if type(value) is not bool:
-                raise LauncherError("configuration key 'gws' must be a boolean")
         elif type(value) is not str or not value:
             raise LauncherError(f"configuration key '{key}' must be a non-empty string")
 
@@ -214,8 +206,6 @@ def resolve_settings(args: argparse.Namespace, config: dict[str, Any], *, cwd: P
         elif getattr(args, key) is not None:
             settings[key] = _resolve_path(getattr(args, key), cwd)
 
-    if args.gws is not None:
-        settings["gws"] = args.gws
     for key in ("github_host", "gitlab_host"):
         if getattr(args, f"no_{key}"):
             settings[key] = None
@@ -286,8 +276,8 @@ def mount_config(settings: dict[str, Any]) -> dict[str, Any]:
                 "selinux_label": "shared",
             }
         )
-    if settings["gws"]:
-        mounts.append({"type": "tmpfs", "target": "/tmp/gws", "mode": 0o777})
+    # Provision storage even when GWS is attached after sandbox creation.
+    mounts.append({"type": "tmpfs", "target": "/tmp/gws", "mode": 0o777})
     return {"podman": {"mounts": mounts}}
 
 
@@ -325,8 +315,6 @@ def environment_args(settings: dict[str, Any], name: str, email: str) -> list[st
     git_config = [("user.name", name), ("user.email", email)]
     if settings["kubeconfig"] is not None:
         environment.append(f"KUBECONFIG={CONTAINER_HOME}/.kube/config")
-    if settings["gws"]:
-        environment.append("EXOSHELL_GWS=1")
     if settings["github_host"] is not None:
         host = settings["github_host"]
         environment.append(f"GH_HOST={host}")

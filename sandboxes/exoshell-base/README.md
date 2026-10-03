@@ -40,16 +40,20 @@ openshell sandbox create \
   -- /usr/local/bin/exoshell-agent /workspace -- codex
 ```
 
-To initialize GWS, also pass `--env EXOSHELL_GWS=1`, attach a provider that
+To initialize GWS, attach a provider that
 supplies non-empty `GWS_CLIENT_ID`, `GWS_CLIENT_SECRET`, and
 `GWS_REFRESH_TOKEN`, and mount a tmpfs at `/tmp/gws`. The helper writes
 `/tmp/gws/credentials.json` as a private `authorized_user` JSON file. It creates
 `/tmp/gws/config` as a private directory for the GWS token and discovery caches,
-then sets the GWS CLI path variables for the command. Without this opt-in, it
-starts the command without requiring GWS values.
-For a GWS launch, add its provider and `--env EXOSHELL_GWS=1`, and add
+then sets the GWS CLI path variables for the command. When none of the three
+values are non-empty, it skips initialization; a partial set fails startup.
+For a direct OpenShell GWS launch, add its provider and add
 `{"type":"tmpfs","target":"/tmp/gws","mode":511}` to the same Podman
 `mounts` array (`511` is the decimal value of mode `0777`).
+The ExOShell launcher supplies this mount unconditionally, including for
+providers attached after creation. After provider changes, wait for application
+and invoke the helper through a fresh exec or SSH environment; an existing shell
+keeps its original environment. Bare agent commands bypass initialization.
 The tmpfs mount supplies the writable directory and keeps its credentials file
 and GWS cache out of the container's writable layer. It is not required for
 GWS itself: an image-created writable `/tmp/gws` would also work. With that
@@ -119,7 +123,7 @@ Skills are available through `/sandbox/.agents/skills` and symlinked into
 
 No credentials, kubeconfig, host home, or agent user configuration are copied
 into the image. The launcher attaches optional host files; the image helper
-initializes GWS placeholders only when requested.
+initializes GWS placeholders when all three provider credentials are available.
 It also recomputes Atlassian MCP state from the attached credential at each
 supported agent startup.
 

@@ -1,5 +1,6 @@
 ---
-status: accepted
+status: superseded
+superseded-by: adr0030-provider-controlled-agent-integrations.md
 date: 2026-10-03
 topics:
   - providers
@@ -8,6 +9,10 @@ topics:
 ---
 
 # 28. Enable Atlassian MCP from its provider credential at agent startup
+
+Superseded by [ADR-0030](adr0030-provider-controlled-agent-integrations.md),
+which preserves Atlassian startup behavior and extends provider-controlled
+initialization to GWS.
 
 ## Context
 

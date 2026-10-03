@@ -73,7 +73,9 @@ default `--no-keep` lifecycle removes the sandbox. `--keep` deliberately
 retains that state for debugging. Codex uses image-owned configuration at
 `/etc/codex`; OpenCode uses an image-provided global configuration from
 `/sandbox/.config/opencode`, which project configuration can override. Optional
-kubeconfig and GWS mounts are independent of agent selection.
-When GWS is selected, the launcher passes `EXOSHELL_GWS=1` and mounts
-`/tmp/gws` as tmpfs. The image executable checks provider environment values
-and creates the private GWS credentials file before starting the agent.
+kubeconfig mounting is independent of agent selection. The launcher always
+mounts `/tmp/gws` as tmpfs, including for providers attached later. The image
+executable creates the private GWS credentials file and config directory when
+all three GWS provider environment values are non-empty. It skips GWS when
+none are non-empty and rejects a partial credential environment before starting
+the agent. Provider changes require a fresh environment and helper invocation.
