@@ -7,6 +7,13 @@ OpenShell sandboxes. It brings together provider profiles, sandbox policies,
 a custom image, and a launcher that mounts the project and starts the selected
 agent using rootless Podman.
 
+Coding agents bring an entire software stack onto your machine: the agent CLI,
+its dependencies, and the tools it runs. A mistaken command, malicious
+instructions hidden in project content, or a compromised dependency can all
+turn that access against you. ExOShell runs this stack in an OpenShell sandbox,
+limiting host filesystem access and keeping supported long-lived credentials
+outside the agent's reach.
+
 OpenShell provides the sandbox isolation; ExOShell makes it practical for
 everyday local agent work without assembling mounts, policies, credentials, and
 agent setup for each run:
