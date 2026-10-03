@@ -49,6 +49,9 @@ environment references. No credential value will be written to configuration.
 
 - Users without the provider do not connect to Atlassian at startup.
 - Arbitrarily named provider instances work through the shared environment key.
+- Codex's CLI override selects embedded mode for interactive sessions and can
+  produce a shared-background-server warning. [ADR-0029](adr0029-codex-embedded-mode-for-provider-controlled-mcp.md)
+  records why this is accepted for the disposable sandbox workflow.
 - Bare client commands bypass recomputation; the launcher and direct users of
   `exoshell-agent` receive automatic behavior. Claude's generated state remains
   until another helper invocation or sandbox deletion.
@@ -65,6 +68,7 @@ environment references. No credential value will be written to configuration.
 
 ## References
 
+- [Codex embedded-mode follow-up](adr0029-codex-embedded-mode-for-provider-controlled-mcp.md)
 - [Image startup decision](adr0023-agent-neutral-image-startup.md)
 - [OAuth credential decision](adr0017-atlassian-mcp-oauth-bearer.md)
 - [Image helper](../sandboxes/exoshell-base/exoshell-agent)

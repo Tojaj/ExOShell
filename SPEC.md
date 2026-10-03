@@ -85,6 +85,11 @@ Claude user state is kept inside `/sandbox/.claude` through `CLAUDE_CONFIG_DIR`.
 Provider changes require a fresh process environment and another helper
 invocation; bare client commands bypass this startup decision.
 
+Codex's CLI enablement override selects embedded mode for interactive sessions
+and can produce a shared-background-server warning. This is accepted for the
+disposable sandbox workflow; MCP remains supported. See
+[ADR-0029](adrs/adr0029-codex-embedded-mode-for-provider-controlled-mcp.md).
+
 OpenShell assigns sandbox names. The launcher adds `managed-by=exoshell`,
 project, and agent labels and passes `--no-keep` by default. Agent state lives
 in the container layer and is discarded at deletion; project files remain on
