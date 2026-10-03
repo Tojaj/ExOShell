@@ -77,6 +77,14 @@ the sandbox. Google Workspace initialization instead writes provider-backed
 placeholders to a private credentials file in tmpfs. Public package registries
 and Atlassian MCP access are opt-in provider integrations.
 
+Atlassian MCP defaults to disabled. At agent startup, the image helper enables
+the built-in entry only when the provider-backed `ATLASSIAN_MCP_BEARER_TOKEN`
+environment value is non-empty. It overrides conflicting entry enablement for
+Codex, Claude Code, and OpenCode while preserving unrelated configuration.
+Claude user state is kept inside `/sandbox/.claude` through `CLAUDE_CONFIG_DIR`.
+Provider changes require a fresh process environment and another helper
+invocation; bare client commands bypass this startup decision.
+
 OpenShell assigns sandbox names. The launcher adds `managed-by=exoshell`,
 project, and agent labels and passes `--no-keep` by default. Agent state lives
 in the container layer and is discarded at deletion; project files remain on

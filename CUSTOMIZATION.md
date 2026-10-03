@@ -89,6 +89,13 @@ USER sandbox
 ENTRYPOINT ["/bin/bash"]
 ```
 
+When replacing Codex or OpenCode defaults in a derived image, retain the
+disabled `atlassian` entry (`enabled = false` or `"enabled": false`). The base
+image's `exoshell-agent` helper enables it from the attached credential at
+startup, including when OpenCode uses a custom `OPENCODE_CONFIG` layer.
+Keep Claude's inherited `CLAUDE_CONFIG_DIR` within a writable agent-state
+directory; its default is `/sandbox/.claude`.
+
 The token-free GitLab configuration contains host metadata only:
 
 ```yaml

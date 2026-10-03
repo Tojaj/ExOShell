@@ -165,9 +165,10 @@ COPY --chmod=0755 exoshell-agent /usr/local/bin/exoshell-agent
 COPY --chown=sandbox:sandbox --chmod=0644 opencode.json /sandbox/.config/opencode/opencode.json
 COPY --chown=sandbox:sandbox --chmod=0644 tui.json /sandbox/.config/opencode/tui.json
 COPY --chown=sandbox:sandbox --chmod=0644 opencode-instructions/ /sandbox/.config/opencode/instructions/
-# User-scope defaults avoid the exclusive-control behavior of managed MCP
-# configuration while making the provider-backed endpoint available.
-COPY --chown=sandbox:sandbox --chmod=0644 claude.config.json /sandbox/.claude.json
+# Keep Claude's mutable user configuration within the writable agent directory.
+# Atlassian is registered by exoshell-agent only with a provider credential.
+ENV CLAUDE_CONFIG_DIR=/sandbox/.claude
+COPY --chmod=0644 claude.config.json /etc/exoshell/claude-atlassian.json
 # Register the public GitLab host without storing credentials. glab requires
 # config.yml to be exactly 0600, so it must be readable by the sandbox user.
 # The root-owned directory prevents glab from atomically replacing this

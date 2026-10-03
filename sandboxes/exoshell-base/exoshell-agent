@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Start a command in a mounted project, with optional GWS initialization."""
+"""Start a command in a project, initializing provider-backed integrations."""
 
 import json
 import os
@@ -11,11 +11,97 @@ import tempfile
 WORKSPACE = Path("/workspace")
 GWS_DIR = Path("/tmp/gws")
 GWS_KEYS = ("GWS_CLIENT_ID", "GWS_CLIENT_SECRET", "GWS_REFRESH_TOKEN")
+ATLASSIAN_KEY = "ATLASSIAN_MCP_BEARER_TOKEN"
+CLAUDE_MCP_TEMPLATE = Path("/etc/exoshell/claude-atlassian.json")
 
 
 def fail(message: str) -> None:
     print(f"exoshell-agent: {message}", file=sys.stderr)
     raise SystemExit(2)
+
+
+def object_field(config: dict, key: str) -> dict:
+    value = config.setdefault(key, {})
+    if not isinstance(value, dict):
+        fail(f"MCP configuration field '{key}' must be an object")
+    return value
+
+
+def initialize_claude_mcp(environment: dict[str, str], project: Path, enabled: bool,
+                          template: Path = CLAUDE_MCP_TEMPLATE) -> None:
+    directory = Path(environment.get("CLAUDE_CONFIG_DIR") or
+                     Path(environment.get("HOME", "/sandbox")) / ".claude").expanduser().resolve()
+    target = directory / ".claude.json"
+    temporary = None
+    try:
+        try:
+            config = json.loads(target.read_text(encoding="utf-8"))
+        except FileNotFoundError:
+            config = {}
+        if not isinstance(config, dict):
+            fail("Claude MCP configuration must be an object")
+        servers = object_field(config, "mcpServers")
+        projects = object_field(config, "projects")
+        state = object_field(projects, str(project))
+        local_servers = object_field(state, "mcpServers")
+        disabled = state.setdefault("disabledMcpServers", [])
+        if not isinstance(disabled, list) or any(not isinstance(name, str) for name in disabled):
+            fail("Claude disabledMcpServers must be a list of names")
+        state["disabledMcpServers"] = [name for name in disabled if name != "atlassian"]
+        if enabled:
+            definition = json.loads(template.read_text(encoding="utf-8"))["mcpServers"]["atlassian"]
+            if not isinstance(definition, dict):
+                fail("Claude Atlassian MCP template must contain a server object")
+            servers["atlassian"] = definition
+            # Local scope wins over user and project scope. Own this name for
+            # the selected project without changing unrelated MCP entries.
+            local_servers["atlassian"] = definition
+        else:
+            servers.pop("atlassian", None)
+            local_servers.pop("atlassian", None)
+            state["disabledMcpServers"].append("atlassian")
+
+        directory.mkdir(mode=0o700, parents=True, exist_ok=True)
+        with tempfile.NamedTemporaryFile(mode="w", encoding="utf-8", dir=directory, delete=False) as file:
+            temporary = Path(file.name)
+            os.fchmod(file.fileno(), 0o600)
+            json.dump(config, file)
+            file.write("\n")
+            file.flush()
+            os.fsync(file.fileno())
+        os.replace(temporary, target)
+    except (OSError, UnicodeError, ValueError, KeyError, TypeError):
+        fail("could not prepare Claude MCP configuration")
+    finally:
+        if temporary is not None:
+            temporary.unlink(missing_ok=True)
+    environment["CLAUDE_CONFIG_DIR"] = str(directory)
+
+
+def initialize_atlassian_mcp(command: list[str], environment: dict[str, str], project: Path) -> list[str]:
+    """The credential placeholder, rather than an instance name, selects MCP."""
+    agent = Path(command[0]).name
+    enabled = bool(environment.get(ATLASSIAN_KEY))
+    if agent == "codex":
+        command = command.copy()
+        # Put the managed leaf last so existing -c overrides cannot select a
+        # different state. Keep a literal -- and its positional arguments intact.
+        position = command.index("--") if "--" in command else len(command)
+        command[position:position] = ["--config", f"mcp_servers.atlassian.enabled={str(enabled).lower()}"]
+    elif agent == "opencode":
+        try:
+            config = json.loads(environment.get("OPENCODE_CONFIG_CONTENT") or "{}")
+        except (ValueError, TypeError):
+            fail("OPENCODE_CONFIG_CONTENT must be a JSON object")
+        if not isinstance(config, dict):
+            fail("OPENCODE_CONFIG_CONTENT must be a JSON object")
+        servers = object_field(config, "mcp")
+        server = object_field(servers, "atlassian")
+        server["enabled"] = enabled
+        environment["OPENCODE_CONFIG_CONTENT"] = json.dumps(config)
+    elif agent == "claude":
+        initialize_claude_mcp(environment, project, enabled)
+    return command
 
 
 def initialize_gws(environment: dict[str, str], directory: Path = GWS_DIR) -> None:
@@ -75,6 +161,7 @@ def main(arguments: list[str]) -> None:
         fail("PROJECT must be a directory below /workspace")
 
     environment = os.environ.copy()
+    command = initialize_atlassian_mcp(arguments[2:], environment, project)
     if environment.get("EXOSHELL_GWS") == "1":
         initialize_gws(environment)
     try:
@@ -82,7 +169,7 @@ def main(arguments: list[str]) -> None:
     except OSError:
         fail("could not enter PROJECT")
     try:
-        os.execvpe(arguments[2], arguments[2:], environment)
+        os.execvpe(command[0], command, environment)
     except FileNotFoundError:
         fail(f"command not found: {arguments[2]}")
     except OSError:

@@ -100,6 +100,14 @@ for operational issues and image-provided tools are baked into
 `/sandbox/.config/opencode/instructions/` and listed explicitly by the global
 configuration.
 
+Atlassian MCP is disabled by default. `exoshell-agent` enables it at startup
+only with a non-empty provider credential placeholder. Runtime overrides
+control the `atlassian` entry even when a project config disagrees. Claude's
+non-secret MCP template is installed at `/etc/exoshell/claude-atlassian.json`;
+the helper registers it in `/sandbox/.claude/.claude.json` only when enabled.
+`CLAUDE_CONFIG_DIR=/sandbox/.claude` keeps mutable Claude state within the
+existing writable policy. See [Atlassian setup and smoke checks](../../providers.md#atlassian-rovo-mcp).
+
 ## Agent skills
 
 The inherited `github` skill remains available. This image adds the official
@@ -112,6 +120,8 @@ Skills are available through `/sandbox/.agents/skills` and symlinked into
 No credentials, kubeconfig, host home, or agent user configuration are copied
 into the image. The launcher attaches optional host files; the image helper
 initializes GWS placeholders only when requested.
+It also recomputes Atlassian MCP state from the attached credential at each
+supported agent startup.
 
 ## Smoke checks
 

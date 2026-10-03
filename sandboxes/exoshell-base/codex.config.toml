@@ -9,6 +9,7 @@ sandbox_mode = "danger-full-access"
 approval_policy = "on-request"
 
 [mcp_servers.atlassian]
+enabled = false
 url = "https://mcp.atlassian.com/v2/mcp"
 bearer_token_env_var = "ATLASSIAN_MCP_BEARER_TOKEN"
 

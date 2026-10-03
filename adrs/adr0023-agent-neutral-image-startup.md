@@ -50,6 +50,10 @@ for ordinary agent startup or direct OpenShell use.
 - Git configuration generation, other provider-specific setup, and host-side
   decisions remain separate choices.
 
+[ADR-0028](adr0028-provider-controlled-atlassian-mcp.md) adds a narrow exception
+to explicit opt-in: the image helper infers Atlassian MCP enablement from its
+provider credential placeholder. GWS still requires its explicit opt-in.
+
 ## References
 
 - [Image executable](../sandboxes/exoshell-base/exoshell-agent)

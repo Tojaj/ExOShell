@@ -7,6 +7,7 @@
   ],
   "mcp": {
     "atlassian": {
+      "enabled": false,
       "type": "remote",
       "url": "https://mcp.atlassian.com/v2/mcp",
       "oauth": false,

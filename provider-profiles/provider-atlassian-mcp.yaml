@@ -1,7 +1,7 @@
 # Atlassian Rovo MCP with an OAuth 2.1 access token.
 #
 # The credential is a short-lived (~1h) Bearer access token obtained and stored
-# directly in the provider by scripts/atlassian-mcp-oauth.sh. OpenCode sends it in the
+# directly in the provider by scripts/atlassian-mcp-oauth.sh. The agent sends it in the
 # Authorization header and OpenShell replaces the placeholder only for the
 # bound Atlassian MCP endpoint.
 #
@@ -34,6 +34,12 @@ endpoints:
     access: read-write
     enforcement: enforce
 binaries:
+  - /usr/bin/codex
+  - /usr/local/bin/codex
+  - /usr/lib/node_modules/@openai/**
+  - /sandbox/.codex/packages/app-server-daemon/releases/*/bin/codex
+  - /usr/bin/claude
+  - /usr/local/bin/claude
   - /usr/bin/opencode
   - /usr/local/bin/opencode
   - /usr/lib/node_modules/opencode-ai/bin/opencode.exe
