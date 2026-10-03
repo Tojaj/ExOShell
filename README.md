@@ -3,9 +3,9 @@
 https://github.com/Tojaj/ExOShell
 
 ExOShell runs Codex, Claude Code, and OpenCode against local projects in NVIDIA
-OpenShell 0.1.0 or later sandboxes. It brings together provider profiles,
-sandbox policies, a custom image, and a launcher that mounts the project and
-starts the selected agent using rootless Podman.
+OpenShell sandboxes. It brings together provider profiles, sandbox policies,
+a custom image, and a launcher that mounts the project and starts the selected
+agent using rootless Podman.
 
 OpenShell provides the sandbox isolation; ExOShell makes it practical for
 everyday local agent work without assembling mounts, policies, credentials, and
@@ -23,6 +23,9 @@ agent setup for each run:
 - **Protected long-lived credentials.** Give agents provider-backed placeholders
   instead of readable secrets, including the Google Workspace OAuth client
   secret and refresh token.
+- **Provider-backed integrations.** Prepare supported service integrations from
+  attached provider credentials at agent startup. Atlassian MCP enables
+  automatically when its credential placeholder is present.
 
 See [`CUSTOMIZATION.md`](CUSTOMIZATION.md) to create derived images, policies,
 and provider profiles for other GitHub or GitLab instances. Keep private
@@ -44,6 +47,11 @@ Codex is the default.
   machine-local TOML file can define defaults and combine common and
   agent-specific providers. Command-line options can override those settings
   without manually assembling `openshell sandbox create`.
+- **Provider-aware agent startup.** The runner invokes the image's
+  `exoshell-agent` helper, which enables or disables the built-in Atlassian MCP
+  entry for Codex, Claude Code, and OpenCode according to the credential
+  placeholder supplied by an attached provider. Provider instance names can
+  vary.
 - **Per-project Git identity.** The runner reads the effective Git `user.name`
   and `user.email` for the selected project. It injects them so commits made in
   the sandbox use the project's intended identity.
