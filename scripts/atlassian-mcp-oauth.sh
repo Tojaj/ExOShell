@@ -21,7 +21,9 @@ RESOURCE_METADATA_URL="$MCP_BASE/.well-known/oauth-protected-resource/v2/mcp"
 STATE_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/openshell"
 STATE_FILE="$STATE_DIR/atlassian-mcp-oauth.json"
 CALLBACK_PORT="${ATLASSIAN_OAUTH_PORT:-8793}"
-DEFAULT_PROVIDER="atlassian-mcp"
+DEFAULT_PROVIDER="exoshell-atlassian-mcp"
+# Unkeyed state predates the namespaced default and belongs to this instance.
+LEGACY_STATE_PROVIDER="atlassian-mcp"
 PROVIDER_NAME="$DEFAULT_PROVIDER"
 
 die()  { printf '%s\n' "$*" >&2; exit 1; }
@@ -52,11 +54,11 @@ migrate_state() {
   jq -e '.providers | type == "object"' "$STATE_FILE" >/dev/null 2>&1 && return
 
   local tmp="$STATE_FILE.tmp.$$"
-  jq --arg provider "$DEFAULT_PROVIDER" '{providers: {($provider): .}}' "$STATE_FILE" > "$tmp" \
+  jq --arg provider "$LEGACY_STATE_PROVIDER" '{providers: {($provider): .}}' "$STATE_FILE" > "$tmp" \
     || die "failed to migrate OAuth state at $STATE_FILE"
   mv "$tmp" "$STATE_FILE"
   chmod 600 "$STATE_FILE"
-  info "migrated OAuth state for provider: $DEFAULT_PROVIDER"
+  info "migrated OAuth state for provider: $LEGACY_STATE_PROVIDER"
 }
 
 read_state() {
@@ -331,7 +333,7 @@ store_access_token() {
 
   if [[ "$action" == "create" ]]; then
     ATLASSIAN_MCP_BEARER_TOKEN="$access_token" \
-      openshell provider create --name "$PROVIDER_NAME" --type atlassian-mcp --from-existing
+      openshell provider create --name "$PROVIDER_NAME" --type exoshell-atlassian-mcp --from-existing
   else
     ATLASSIAN_MCP_BEARER_TOKEN="$access_token" \
       openshell provider update "$PROVIDER_NAME" --from-existing

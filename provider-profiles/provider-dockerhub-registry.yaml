@@ -1,7 +1,9 @@
 # Anonymous Docker Hub reads for agents and OCI tools.
 # Python may resolve to a uv-managed interpreter inside the sandbox.
-id: dockerhub-registry
-display_name: Docker Hub registry (read-only)
+id: exoshell-dockerhub-registry-ro
+annotations:
+  exoshell-origin: ExOShell
+display_name: ExOShell Docker Hub registry (read-only)
 description: Public OCI image and artifact metadata and downloads from Docker Hub
 category: data
 endpoints:

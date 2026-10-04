@@ -143,7 +143,7 @@ chcon --reference=. path/to/file
 ```
 
 Arguments after `--` are passed unchanged to the selected executable. Without
-`.exoshell.local.toml`, defaults are the local image, Codex, provider `openai`,
+`.exoshell.local.toml`, defaults are the local image, Codex, provider `exoshell-codex`,
 and no optional integrations.
 
 Copy `.exoshell.local.toml.example` to the ignored `.exoshell.local.toml` for
@@ -152,16 +152,16 @@ agent:
 
 ```toml
 agent = "codex"
-providers = ["gh-personal", "gws-oauth"]
+providers = ["exoshell-github", "exoshell-gws"]
 
 [agents.codex]
-providers = ["codex", "atlassian-mcp"]
+providers = ["exoshell-codex", "exoshell-atlassian-mcp"]
 
 [agents.claude]
-providers = ["claude-code", "atlassian-mcp"]
+providers = ["exoshell-claude-code", "exoshell-atlassian-mcp"]
 
 [agents.opencode]
-providers = ["opencode-openrouter", "atlassian-mcp"]
+providers = ["exoshell-opencode-openrouter", "exoshell-atlassian-mcp"]
 ```
 
 OpenShell generates a unique sandbox name for each launcher invocation. Each
@@ -197,7 +197,7 @@ sandbox—for example the Codex OpenAI and OpenCode OpenAI profiles both export
 Public npm, PyPI, Go module, and Cargo registry access is opt-in through
 independent, credential-free [package registry providers](providers.md#opt-in-package-registries).
 In particular, `uvx`/pip dependency downloads (including Python MCP server
-installation) now require the `pypi-packages` instance; merely having uv in
+installation) require the `exoshell-pypi-packages-ro` instance; merely having uv in
 the image does not grant PyPI access.
 
 ## Credentials and state

@@ -1,7 +1,9 @@
 # Network grant only: the ExOShell base image does not install Go. Adjust the
 # Go binary paths to match the image used by the sandbox before importing.
-id: go-modules
-display_name: Go modules
+id: exoshell-go-modules-ro
+annotations:
+  exoshell-origin: ExOShell
+display_name: ExOShell Go modules (read-only)
 description: Official Go module proxy and checksum service, without VCS fallbacks
 category: data
 endpoints:

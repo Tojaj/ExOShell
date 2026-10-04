@@ -13,8 +13,10 @@
 #   openshell provider profile import -f provider-profiles/provider-atlassian-mcp.yaml
 #
 #   ./scripts/atlassian-mcp-oauth.sh sync
-id: atlassian-mcp
-display_name: Atlassian Rovo MCP
+id: exoshell-atlassian-mcp
+annotations:
+  exoshell-origin: ExOShell
+display_name: ExOShell Atlassian Rovo MCP
 description: Atlassian Rovo MCP access using an OAuth 2.1 Bearer token
 category: knowledge
 credentials:

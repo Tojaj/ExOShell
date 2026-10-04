@@ -8,16 +8,18 @@
 #
 # Provider instance creation (one-time, on the host):
 #
-#   openshell provider profile lint -f provider-profiles/provider-gws-oauth.yaml
-#   openshell provider profile import -f provider-profiles/provider-gws-oauth.yaml
+#   openshell provider profile lint -f provider-profiles/provider-gws-cli.yaml
+#   openshell provider profile import -f provider-profiles/provider-gws-cli.yaml
 #
 #   GWS_CREDS=$(gws auth export --unmasked)
-#   openshell provider create --name gws-oauth --type gws-oauth \
+#   openshell provider create --name exoshell-gws --type exoshell-gws-cli \
 #     --credential "GWS_CLIENT_ID=$(echo "$GWS_CREDS" | jq -r .client_id)" \
 #     --credential "GWS_CLIENT_SECRET=$(echo "$GWS_CREDS" | jq -r .client_secret)" \
 #     --credential "GWS_REFRESH_TOKEN=$(echo "$GWS_CREDS" | jq -r .refresh_token)"
-id: gws-oauth
-display_name: Google Workspace CLI (OAuth)
+id: exoshell-gws-cli
+annotations:
+  exoshell-origin: ExOShell
+display_name: ExOShell Google Workspace CLI (OAuth)
 description: >-
   OAuth credentials for gws CLI with request body rewrite on its token
   endpoints. client_secret and refresh_token never enter the sandbox in

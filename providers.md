@@ -5,6 +5,35 @@ permitted binaries. Provider instances store the local credentials for those
 profiles that require them. Import only the profiles and create only the
 instances needed on a machine.
 
+## Names and origin
+
+ExOShell-supplied profile IDs start with `exoshell-`, display names start with
+"ExOShell", and each profile carries `annotations: {exoshell-origin: ExOShell}`.
+The annotation identifies the source of the definition; it does not establish
+installer ownership. Profile filenames are independent of their IDs.
+
+Use profile IDs with `provider create --type`; use instance names with the
+launcher's `--provider` and TOML `providers` arrays. Suggested instance names
+drop a profile's trailing `-cli`; other instance names match the profile ID.
+Instance names remain configurable.
+
+| Profile ID | Suggested instance name |
+| --- | --- |
+| `exoshell-codex-cli` | `exoshell-codex` |
+| `exoshell-claude-code-cli` | `exoshell-claude-code` |
+| `exoshell-github-cli` | `exoshell-github` |
+| `exoshell-gitlab-cli` | `exoshell-gitlab` |
+| `exoshell-gws-cli` | `exoshell-gws` |
+| `exoshell-opencode-openai` | `exoshell-opencode-openai` |
+| `exoshell-opencode-anthropic` | `exoshell-opencode-anthropic` |
+| `exoshell-opencode-openrouter` | `exoshell-opencode-openrouter` |
+| `exoshell-atlassian-mcp` | `exoshell-atlassian-mcp` |
+
+Registry profiles and suggested instances share the IDs in the table below.
+Their `-ro` suffix means consumption without publishing, including npm's
+narrowly scoped audit requests. Authenticated private downloads can also be
+read-only. `-publish` is reserved for future publishing profiles.
+
 ## Opt-in package registries
 
 Seven independent, credential-free profiles grant package or container image
@@ -13,48 +42,56 @@ publishing access:
 
 | Profile / instance | Public endpoints | Client operations |
 | --- | --- | --- |
-| `npm-registry` | `registry.npmjs.org` | npm install/update, search and audit (only the two npm audit POST paths) |
-| `pypi-packages` | `pypi.org`, `files.pythonhosted.org` | pip/uv indexes, metadata and downloads |
-| `go-modules` | `proxy.golang.org`, `sum.golang.org` | Go proxy resolution and checksum verification |
-| `cargo-crates` | `index.crates.io`, `static.crates.io`, `crates.io` | Cargo index, downloads, search and metadata |
-| `ghcr-registry` | `ghcr.io`, `pkg-containers.githubusercontent.com` | Public OCI image and artifact reads by agents, `curl`, `oras`, `skopeo`, and Python tools |
-| `dockerhub-registry` | `registry-1.docker.io`, `auth.docker.io`, `production.cloudfront.docker.com`, `docker-images-prod.6aa30f8b08e16409b46e0173d6de2f56.r2.cloudflarestorage.com` | Public OCI image and artifact reads by agents, `curl`, `oras`, `skopeo`, and Python tools |
-| `quay-registry` | `quay.io`, `cdn.quay.io`, `cdn01.quay.io` through `cdn06.quay.io` | Public OCI image and artifact reads by agents, `curl`, `oras`, `skopeo`, and Python tools |
+| `exoshell-npm-registry-ro` | `registry.npmjs.org` | npm install/update, search and audit (only the two npm audit POST paths) |
+| `exoshell-pypi-packages-ro` | `pypi.org`, `files.pythonhosted.org` | pip/uv indexes, metadata and downloads |
+| `exoshell-go-modules-ro` | `proxy.golang.org`, `sum.golang.org` | Go proxy resolution and checksum verification |
+| `exoshell-cargo-crates-ro` | `index.crates.io`, `static.crates.io`, `crates.io` | Cargo index, downloads, search and metadata |
+| `exoshell-ghcr-registry-ro` | `ghcr.io`, `pkg-containers.githubusercontent.com` | Public OCI image and artifact reads by agents, `curl`, `oras`, `skopeo`, and Python tools |
+| `exoshell-dockerhub-registry-ro` | `registry-1.docker.io`, `auth.docker.io`, `production.cloudfront.docker.com`, `docker-images-prod.6aa30f8b08e16409b46e0173d6de2f56.r2.cloudflarestorage.com` | Public OCI image and artifact reads by agents, `curl`, `oras`, `skopeo`, and Python tools |
+| `exoshell-quay-registry-ro` | `quay.io`, `cdn.quay.io`, `cdn01.quay.io` through `cdn06.quay.io` | Public OCI image and artifact reads by agents, `curl`, `oras`, `skopeo`, and Python tools |
 
 All seven allow GET/HEAD/OPTIONS; npm alone also allows POST to
 `/-/npm/v1/security/advisories/bulk` and `/-/npm/v1/security/audits/quick`.
 Publishing, login, and unrelated POST/PUT/PATCH/DELETE requests are not granted.
 
 Import and create only the ecosystems needed by a project. For each desired
-name below (for example `npm-registry`), run:
+name below (for example `exoshell-npm-registry-ro`), run:
 
 ```bash
 openshell provider profile lint -f provider-profiles/provider-npm-registry.yaml
 openshell provider profile import -f provider-profiles/provider-npm-registry.yaml
-openshell provider create --name npm-registry --type npm-registry
+openshell provider create --name exoshell-npm-registry-ro --type exoshell-npm-registry-ro
 ```
 
 These profiles require no credentials. Do not supply a dummy credential,
 `--runtime-credentials`, or `--from-existing` for them.
 
-Use the corresponding `provider-<name>.yaml` and `--name <name> --type <name>`
-for `pypi-packages`, `go-modules`, `cargo-crates`, and `ghcr-registry`. For the
-two additional container registries:
+For PyPI, Go, Cargo, and GHCR, select the file and ID independently:
+
+| Profile file under `provider-profiles/` | Profile ID / instance |
+| --- | --- |
+| `provider-pypi-packages.yaml` | `exoshell-pypi-packages-ro` |
+| `provider-go-modules.yaml` | `exoshell-go-modules-ro` |
+| `provider-cargo-crates.yaml` | `exoshell-cargo-crates-ro` |
+| `provider-ghcr-registry.yaml` | `exoshell-ghcr-registry-ro` |
+
+Lint/import the selected file, then create with `--name <instance> --type <id>`.
+For the two additional container registries:
 
 ```bash
 openshell provider profile lint -f provider-profiles/provider-dockerhub-registry.yaml
 openshell provider profile import -f provider-profiles/provider-dockerhub-registry.yaml
-openshell provider create --name dockerhub-registry --type dockerhub-registry
+openshell provider create --name exoshell-dockerhub-registry-ro --type exoshell-dockerhub-registry-ro
 
 openshell provider profile lint -f provider-profiles/provider-quay-registry.yaml
 openshell provider profile import -f provider-profiles/provider-quay-registry.yaml
-openshell provider create --name quay-registry --type quay-registry
+openshell provider create --name exoshell-quay-registry-ro --type exoshell-quay-registry-ro
 ```
 
 These profiles have no credential discovery. They compose with an agent's
 inference provider; their names select provider *instances*, not profile files.
 
-The `ghcr-registry` profile permits agents, `curl`, `oras`, `skopeo`, and Python
+The `exoshell-ghcr-registry-ro` profile permits agents, `curl`, `oras`, `skopeo`, and Python
 to read public GHCR tokens, image manifests, and artifacts. GHCR may redirect blob
 downloads to `pkg-containers.githubusercontent.com`. Attach it when running the
 base-image version checker inside an OpenShell sandbox; that checker validates
@@ -63,12 +100,12 @@ by the host's container engine. OCI repository names use ordinary slashes in
 request paths, so this profile does not enable `allow_encoded_slash`; the
 checker's encoded slash is in a token-request query parameter.
 
-The `dockerhub-registry` profile permits anonymous token requests to
+The `exoshell-dockerhub-registry-ro` profile permits anonymous token requests to
 `auth.docker.io` and image reads from `registry-1.docker.io`, including redirects
 to Docker's CloudFront and Cloudflare R2 download hosts. See the
 [Docker allowlist](https://docs.docker.com/desktop/enterprise/allow-list/) and
 [Docker maintainer confirmation of the R2 host](https://github.com/docker/docs/issues/21960).
-The `quay-registry` profile covers `quay.io` (including its anonymous token
+The `exoshell-quay-registry-ro` profile covers `quay.io` (including its anonymous token
 endpoint) and the seven exact CDN hosts listed in the
 [upstream firewall documentation](https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html/installation_configuration/configuring-firewall).
 Both profiles use ordinary slashes in repository paths and leave
@@ -86,15 +123,15 @@ the base and derived image layers, inspect a public image in a sandbox with the
 matching provider attached:
 
 ```bash
-# dockerhub-registry
+# exoshell-dockerhub-registry-ro
 skopeo inspect docker://docker.io/library/alpine:latest
 oras manifest fetch docker.io/library/alpine:latest
 
-# quay-registry
+# exoshell-quay-registry-ro
 skopeo inspect docker://quay.io/prometheus/busybox:latest
 oras manifest fetch quay.io/prometheus/busybox:latest
 
-# ghcr-registry
+# exoshell-ghcr-registry-ro
 skopeo inspect docker://ghcr.io/astral-sh/uv:0.12.22
 ```
 
@@ -112,7 +149,7 @@ the inference provider: CLI options replace the complete configured list.
 
 ```bash
 ./run-exoshell-agent.sh --agent codex \
-  --provider codex --provider dockerhub-registry --provider quay-registry \
+  --provider exoshell-codex --provider exoshell-dockerhub-registry-ro --provider exoshell-quay-registry-ro \
   . -- exec 'reply with OK'
 ```
 
@@ -120,7 +157,7 @@ Direct OpenShell launches can also attach them independently:
 
 ```bash
 openshell sandbox create --from localhost/exoshell-local:latest \
-  --policy policies/policy.yaml --provider codex --provider npm-registry \
+  --policy policies/policy.yaml --provider exoshell-codex --provider exoshell-npm-registry-ro \
   -- codex
 ```
 
@@ -136,7 +173,8 @@ interpreter under `/sandbox/.uv/python/`.
 
 To use an enterprise proxy, mirror, or private registry, copy the relevant
 profile YAML under a new filename, change `id`, `display_name` and the endpoint
-host(s) to the actual service, and lint/import/create a new instance from it.
+host(s) to the actual service, set origin metadata to your own source, and
+lint/import/create a new instance from it.
 Configure the corresponding npm, pip/uv, Go, or Cargo client to use that
 endpoint separately; attaching a provider does not reconfigure the client.
 Some ecosystems require separate index, download, and checksum hosts. Add only
@@ -193,6 +231,10 @@ shell scripts. Prefer `--from-existing` where the profile supports credential
 discovery; it reads the required environment value from the host shell and
 stores it through OpenShell.
 
+Future installation tooling must record the objects it creates. Uninstall must
+use that record and check modifications and dependencies; names and origin
+annotations alone are insufficient grounds for deletion.
+
 ## Composition and policy
 
 Do not attach providers that export the same credential environment variable to
@@ -209,12 +251,12 @@ overlay workflow and [`CUSTOMIZATION.md`](CUSTOMIZATION.md) for custom hosts.
 
 ## Codex CLI
 
-`codex-cli` runs Codex with an OpenAI API key, rather than ChatGPT OAuth. It
+`exoshell-codex-cli` runs Codex with an OpenAI API key, rather than ChatGPT OAuth. It
 allows unresolved provider placeholders in inference request bodies so a
 credential from another provider is never substituted into a conversation sent
 to OpenAI.
 
-Do not attach it with `opencode-openai`: both export `OPENAI_API_KEY`.
+Do not attach it with `exoshell-opencode-openai`: both export `OPENAI_API_KEY`.
 
 ```bash
 openshell provider profile lint -f provider-profiles/provider-codex-cli.yaml
@@ -222,8 +264,8 @@ openshell provider profile import -f provider-profiles/provider-codex-cli.yaml
 ```
 
 ```bash
-openshell provider create --name codex \
-  --type codex-cli --credential OPENAI_API_KEY
+openshell provider create --name exoshell-codex \
+  --type exoshell-codex-cli --credential OPENAI_API_KEY
 ```
 
 The custom profile is required because the built-in Codex profile injects
@@ -234,16 +276,16 @@ Smoke test by launching Codex with the provider and asking it to complete a
 small request:
 
 ```bash
-./run-exoshell-agent.sh --agent codex --provider codex . -- exec 'reply with OK'
+./run-exoshell-agent.sh --agent codex --provider exoshell-codex . -- exec 'reply with OK'
 ```
 
 ## Claude Code CLI
 
-`claude-code-cli` supplies an Anthropic API key to Claude Code. Inference
+`exoshell-claude-code-cli` supplies an Anthropic API key to Claude Code. Inference
 request bodies can contain opaque placeholders from other providers, so the
 profile preserves those placeholders until the appropriate request is made.
 
-Do not attach it with `opencode-anthropic`: both export `ANTHROPIC_API_KEY`.
+Do not attach it with `exoshell-opencode-anthropic`: both export `ANTHROPIC_API_KEY`.
 Subscription OAuth is not supported because it requires sandbox-readable
 persistent credentials.
 
@@ -253,8 +295,8 @@ openshell provider profile import -f provider-profiles/provider-claude-code-cli.
 ```
 
 ```bash
-openshell provider create --name claude-code \
-  --type claude-code-cli --credential ANTHROPIC_API_KEY
+openshell provider create --name exoshell-claude-code \
+  --type exoshell-claude-code-cli --credential ANTHROPIC_API_KEY
 ```
 
 The provider keeps the API key behind an OpenShell placeholder rather than
@@ -263,13 +305,13 @@ placing readable credentials in Claude Code state.
 Smoke test:
 
 ```bash
-./run-exoshell-agent.sh --agent claude --provider claude-code . -- \
+./run-exoshell-agent.sh --agent claude --provider exoshell-claude-code . -- \
   -p 'reply with OK'
 ```
 
 ## OpenCode with OpenRouter
 
-`opencode-openrouter` supplies an OpenRouter API key to OpenCode. It is the
+`exoshell-opencode-openrouter` supplies an OpenRouter API key to OpenCode. It is the
 default OpenCode provider in the example launcher configuration.
 
 Do not use OpenCode's `/connect` flow. It writes readable credentials to
@@ -282,8 +324,8 @@ openshell provider profile import -f provider-profiles/provider-opencode-openrou
 ```
 
 ```bash
-openshell provider create --name opencode-openrouter \
-  --type opencode-openrouter --credential OPENROUTER_API_KEY
+openshell provider create --name exoshell-opencode-openrouter \
+  --type exoshell-opencode-openrouter --credential OPENROUTER_API_KEY
 ```
 
 The profile grants OpenCode access only to OpenRouter and retains opaque
@@ -292,16 +334,16 @@ placeholders in inference request bodies.
 Smoke test by starting OpenCode with a known OpenRouter model:
 
 ```bash
-./run-exoshell-agent.sh --agent opencode --provider opencode-openrouter . -- \
+./run-exoshell-agent.sh --agent opencode --provider exoshell-opencode-openrouter . -- \
   --model openrouter/example
 ```
 
 ## OpenCode with OpenAI
 
-`opencode-openai` supplies an OpenAI API key to OpenCode. Use it when OpenCode
+`exoshell-opencode-openai` supplies an OpenAI API key to OpenCode. Use it when OpenCode
 should call OpenAI directly instead of OpenRouter.
 
-Do not attach it with `codex`: both export `OPENAI_API_KEY`. Do not use
+Do not attach it with `exoshell-codex`: both export `OPENAI_API_KEY`. Do not use
 OpenCode's `/connect` flow because it persists readable credentials.
 
 ```bash
@@ -310,8 +352,8 @@ openshell provider profile import -f provider-profiles/provider-opencode-openai.
 ```
 
 ```bash
-openshell provider create --name opencode-openai \
-  --type opencode-openai --credential OPENAI_API_KEY
+openshell provider create --name exoshell-opencode-openai \
+  --type exoshell-opencode-openai --credential OPENAI_API_KEY
 ```
 
 The profile keeps the key provider-backed while allowing OpenCode's inference
@@ -322,10 +364,10 @@ model supported by the image configuration.
 
 ## OpenCode with Anthropic
 
-`opencode-anthropic` supplies an Anthropic API key to OpenCode. Use it when
+`exoshell-opencode-anthropic` supplies an Anthropic API key to OpenCode. Use it when
 OpenCode should call Anthropic directly.
 
-Do not attach it with `claude-code`: both export `ANTHROPIC_API_KEY`. Do not
+Do not attach it with `exoshell-claude-code`: both export `ANTHROPIC_API_KEY`. Do not
 use OpenCode's `/connect` flow because it persists readable credentials.
 
 ```bash
@@ -334,8 +376,8 @@ openshell provider profile import -f provider-profiles/provider-opencode-anthrop
 ```
 
 ```bash
-openshell provider create --name opencode-anthropic \
-  --type opencode-anthropic --credential ANTHROPIC_API_KEY
+openshell provider create --name exoshell-opencode-anthropic \
+  --type exoshell-opencode-anthropic --credential ANTHROPIC_API_KEY
 ```
 
 The profile uses the same placeholder-safe inference pattern as the other
@@ -346,7 +388,7 @@ model supported by the image configuration.
 
 ## GitHub CLI
 
-`github-cli` supplies `GITHUB_TOKEN` and `GH_TOKEN` to `gh` and Git-over-HTTPS
+`exoshell-github-cli` supplies `GITHUB_TOKEN` and `GH_TOKEN` to `gh` and Git-over-HTTPS
 for GitHub.com. It permits read-only API access plus clone and fetch at
 baseline.
 
@@ -362,7 +404,7 @@ openshell provider profile import -f provider-profiles/provider-github-cli.yaml
 
 ```bash
 export GITHUB_TOKEN="$(gh auth token)"
-openshell provider create --name gh-personal --type github-cli --from-existing
+openshell provider create --name exoshell-github --type exoshell-github-cli --from-existing
 unset GITHUB_TOKEN
 ```
 
@@ -371,7 +413,7 @@ The custom profile replaces the built-in `github` profile because it omits
 to grant approved GraphQL mutations; a provider-owned read-only GraphQL endpoint
 could only narrow such an override. See [ADR 1](adrs/adr0001-graphql-endpoint-declared-once-in-user-policy.md).
 
-Smoke test inside a sandbox that attaches `gh-personal`:
+Smoke test inside a sandbox that attaches `exoshell-github`:
 
 ```bash
 gh repo list
@@ -381,7 +423,7 @@ git ls-remote https://github.com/<owner>/<repository>.git
 
 ## GitLab.com CLI
 
-`gitlab-cli` supplies `GITLAB_TOKEN` and `GLAB_TOKEN` to `glab` and Git-over-
+`exoshell-gitlab-cli` supplies `GITLAB_TOKEN` and `GLAB_TOKEN` to `glab` and Git-over-
 HTTPS for GitLab.com. It permits read-only REST API access plus clone and fetch
 at baseline.
 
@@ -401,7 +443,7 @@ openshell provider profile import -f provider-profiles/provider-gitlab-cli.yaml
 glab auth status --hostname gitlab.com --show-token
 # Put the token into env var:
 export GITLAB_TOKEN="<TOKEN>"
-openshell provider create --name glab-com --type gitlab-cli --from-existing
+openshell provider create --name exoshell-gitlab --type exoshell-gitlab-cli --from-existing
 unset GITLAB_TOKEN
 ```
 
@@ -414,7 +456,7 @@ launcher must select this host. Remove any equal-specificity GitLab.com audit
 entry from the active policy after attaching the provider, because it conflicts
 with the provider's enforce endpoint.
 
-Smoke test inside a sandbox that attaches `glab-com`:
+Smoke test inside a sandbox that attaches `exoshell-gitlab`:
 
 ```bash
 glab auth status --hostname gitlab.com
@@ -423,7 +465,7 @@ git ls-remote https://gitlab.com/<namespace>/<project>.git
 
 ## Google Workspace OAuth
 
-`gws-oauth` provides OAuth credentials to the Google Workspace CLI. The
+`exoshell-gws-cli` provides OAuth credentials to the Google Workspace CLI. The
 sandbox receives placeholders for the client ID, client secret, and refresh
 token; OpenShell substitutes the secret values only in OAuth token request
 bodies. GWS 0.22.5 uses `accounts.google.com/o/oauth2/token` through
@@ -437,13 +479,13 @@ are non-empty. A partial set fails startup; an absent set skips initialization.
 Refresh or replace the provider after reauthorizing on the host with changed scopes.
 
 ```bash
-openshell provider profile lint -f provider-profiles/provider-gws-oauth.yaml
-openshell provider profile import -f provider-profiles/provider-gws-oauth.yaml
+openshell provider profile lint -f provider-profiles/provider-gws-cli.yaml
+openshell provider profile import -f provider-profiles/provider-gws-cli.yaml
 ```
 
 ```bash
 GWS_CREDS="$(gws auth export --unmasked)"
-openshell provider create --name gws-oauth --type gws-oauth \
+openshell provider create --name exoshell-gws --type exoshell-gws-cli \
   --credential "GWS_CLIENT_ID=$(jq -r .client_id <<<"$GWS_CREDS")" \
   --credential "GWS_CLIENT_SECRET=$(jq -r .client_secret <<<"$GWS_CREDS")" \
   --credential "GWS_REFRESH_TOKEN=$(jq -r .refresh_token <<<"$GWS_CREDS")"
@@ -454,7 +496,7 @@ The provider uses request-body credential rewriting because the GWS CLI ignores
 environment-variable authentication while its encrypted credentials file is
 present. See [ADR 2](adrs/adr0002-gws-credentials-via-provider-body-rewrite.md).
 
-Smoke test inside a sandbox launched with `--provider gws-oauth`:
+Smoke test inside a sandbox launched with `--provider exoshell-gws`:
 
 ```bash
 gws drive files list --params '{"pageSize":1,"fields":"files(id),nextPageToken"}'
@@ -464,15 +506,9 @@ gws drive files list --params '{"pageSize":1,"fields":"files(id),nextPageToken"}
 without testing a token exchange. Do not print the provider credential
 environment variables.
 
-After changing an already imported profile, export it to retain its
-`resource_version`, add the changed endpoint to that export, and run
-`openshell profile update gws-oauth -f <exported-profile>`. Profile import is
-create-only. Running sandboxes pick up the changed provider policy on their next
-configuration sync.
-
 ## Atlassian Rovo MCP
 
-`atlassian-mcp` supplies a short-lived OAuth 2.1 Bearer token to the Atlassian
+`exoshell-atlassian-mcp` supplies a short-lived OAuth 2.1 Bearer token to the Atlassian
 Rovo MCP endpoint used by the image-provided Codex, Claude Code, and OpenCode
 configurations. The refresh token remains on the host.
 
@@ -509,16 +545,11 @@ openshell provider profile lint -f provider-profiles/provider-atlassian-mcp.yaml
 openshell provider profile import -f provider-profiles/provider-atlassian-mcp.yaml
 ```
 
-For an already imported profile, use the [profile update workflow](CUSTOMIZATION.md#lint-and-import-profiles)
-to apply the Codex and Claude binary permissions. Import is create-only.
-Rebuild the base and derived image layers and create new sandboxes to adopt
-the disabled defaults and startup helper.
-
 ```bash
 ./scripts/atlassian-mcp-oauth.sh sync
 ```
 
-`sync` creates `atlassian-mcp` from the imported profile when needed, opens a
+`sync` creates `exoshell-atlassian-mcp` from the imported profile when needed, opens a
 browser for authorization when host-side OAuth state is unavailable, and
 otherwise refreshes the provider directly. It stores per-provider client and
 refresh-token state in `~/.config/openshell/atlassian-mcp-oauth.json`, never the
@@ -526,8 +557,8 @@ access token. Use `--provider <name>` to manage a separately named instance.
 To revoke access and remove the default instance:
 
 ```bash
-./scripts/atlassian-mcp-oauth.sh revoke --provider atlassian-mcp
-openshell provider delete --name atlassian-mcp
+./scripts/atlassian-mcp-oauth.sh revoke --provider exoshell-atlassian-mcp
+openshell provider delete exoshell-atlassian-mcp
 ```
 
 The provider uses a Bearer token instead of request-body rewriting because

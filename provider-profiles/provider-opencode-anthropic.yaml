@@ -1,6 +1,8 @@
 # OpenCode with provider-backed Anthropic authentication.
-id: opencode-anthropic
-display_name: OpenCode (Anthropic)
+id: exoshell-opencode-anthropic
+annotations:
+  exoshell-origin: ExOShell
+display_name: ExOShell OpenCode (Anthropic)
 description: OpenCode agent CLI using Anthropic; inference bodies may contain opaque placeholders
 category: agent
 inference_capable: true

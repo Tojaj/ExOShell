@@ -63,6 +63,12 @@ filesystem grants. Import and create only the providers needed for a session;
 providers.md documents the supported profiles. Avoid attaching profiles with
 conflicting credential environment variables.
 
+Supplied profile IDs start with `exoshell-` and carry the `exoshell-origin:
+ExOShell` annotation. Suggested instance names drop a trailing `-cli`; registry
+profiles and suggested instances use `-ro` for consumption without publishing.
+The Codex fallback instance is `exoshell-codex`. Instance names remain configurable,
+and origin metadata does not establish installer ownership. See ADR-0031.
+
 GitHub and GitLab GraphQL endpoints are declared once per host in user policy,
 allowing network overlays to replace an entry when enabling writes. Provider
 profiles retain credential bindings and REST/Git transport rules. Overlay

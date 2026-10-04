@@ -1,7 +1,9 @@
 # Anonymous Quay.io reads for agents and OCI tools.
 # Python may resolve to a uv-managed interpreter inside the sandbox.
-id: quay-registry
-display_name: Quay.io registry (read-only)
+id: exoshell-quay-registry-ro
+annotations:
+  exoshell-origin: ExOShell
+display_name: ExOShell Quay.io registry (read-only)
 description: Public OCI image and artifact metadata and downloads from quay.io
 category: data
 endpoints:

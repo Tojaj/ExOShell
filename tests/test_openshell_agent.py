@@ -83,7 +83,7 @@ class ResolutionTests(unittest.TestCase):
             settings = launcher.resolve_settings(self.parse(), {}, cwd=cwd)
             self.assertEqual(settings["agent"], "codex")
             self.assertFalse(settings["keep"])
-            self.assertEqual(settings["providers"], ["openai"])
+            self.assertEqual(settings["providers"], ["exoshell-codex"])
             self.assertEqual(settings["container_project"], "/workspace")
 
     def test_agent_selection_provider_composition(self) -> None:

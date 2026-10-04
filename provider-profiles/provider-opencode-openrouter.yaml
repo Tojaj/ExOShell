@@ -1,6 +1,8 @@
 # OpenCode with provider-backed OpenRouter authentication.
-id: opencode-openrouter
-display_name: OpenCode (OpenRouter)
+id: exoshell-opencode-openrouter
+annotations:
+  exoshell-origin: ExOShell
+display_name: ExOShell OpenCode (OpenRouter)
 description: OpenCode agent CLI using OpenRouter; inference bodies may contain opaque placeholders
 category: agent
 inference_capable: true

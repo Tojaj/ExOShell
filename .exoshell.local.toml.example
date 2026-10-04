@@ -5,9 +5,9 @@ agent = "codex"
 
 # Providers used by every agent.
 # GWS initialization is automatic when its provider credentials are available.
-providers = ["gh-personal", "gws-oauth"]
+providers = ["exoshell-github", "exoshell-gws"]
 # Optionally add only the package registries this project needs:
-# providers = ["gh-personal", "gws-oauth", "npm-registry", "pypi-packages", "ghcr-registry", "dockerhub-registry", "quay-registry"]
+# providers = ["exoshell-github", "exoshell-gws", "exoshell-npm-registry-ro", "exoshell-pypi-packages-ro", "exoshell-ghcr-registry-ro", "exoshell-dockerhub-registry-ro", "exoshell-quay-registry-ro"]
 
 # Optional integrations are disabled when omitted.
 # policy = "policies/policy.yaml"
@@ -16,13 +16,13 @@ providers = ["gh-personal", "gws-oauth"]
 # gitlab_host = "gitlab.example.com"
 
 [agents.codex]
-providers = ["codex"]
-# Add "atlassian-mcp" after configuring the optional Atlassian integration.
+providers = ["exoshell-codex"]
+# Add "exoshell-atlassian-mcp" after configuring the optional Atlassian integration.
 
 [agents.claude]
-providers = ["claude-code"]
-# Add "atlassian-mcp" after configuring the optional Atlassian integration.
+providers = ["exoshell-claude-code"]
+# Add "exoshell-atlassian-mcp" after configuring the optional Atlassian integration.
 
 [agents.opencode]
-providers = ["opencode-openrouter"]
-# Add "atlassian-mcp" after configuring the optional Atlassian integration.
+providers = ["exoshell-opencode-openrouter"]
+# Add "exoshell-atlassian-mcp" after configuring the optional Atlassian integration.

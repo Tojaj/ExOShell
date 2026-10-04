@@ -535,6 +535,8 @@ gitlab_host = "gitlab.example.com"
 ```
 
 Provider names are local choices; profile IDs must match the imported profile.
+Use your own namespace and origin metadata for definitions you maintain; the
+`exoshell-` prefix and `exoshell-origin: ExOShell` identify supplied definitions.
 Do not attach two GitHub profiles that export the same environment variable, or
 two GitLab profiles that export `GITLAB_TOKEN` and `GLAB_TOKEN`, to one sandbox.
 Use separate sandboxes when switching between same-service instances.

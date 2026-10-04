@@ -22,8 +22,10 @@
 # github_graphql network policy (protocol: graphql) for api.github.com:443.
 # Without it, POST /graphql is parsed as REST, matched by the read-only REST
 # preset, and denied. policy.yaml carries that entry.
-id: github-cli
-display_name: GitHub (CLI, no /graphql endpoint)
+id: exoshell-github-cli
+annotations:
+  exoshell-origin: ExOShell
+display_name: ExOShell GitHub (CLI, no /graphql endpoint)
 description: >-
   GitHub API and git HTTPS. Credential binding only — /graphql is declared in
   sandbox policy so overlays can control GraphQL mutation access on demand.

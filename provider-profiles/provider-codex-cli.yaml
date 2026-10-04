@@ -5,8 +5,10 @@
 # other providers' placeholders (e.g. `gh auth status`). Body rewrite would
 # send the real GitHub token to OpenAI. allow_uninspected_credentials forwards
 # the opaque placeholder instead. Header rewrite for OPENAI_API_KEY is unchanged.
-id: codex-cli
-display_name: Codex CLI
+id: exoshell-codex-cli
+annotations:
+  exoshell-origin: ExOShell
+display_name: ExOShell Codex CLI
 description: OpenAI Codex CLI with API-key auth; conversation hosts may forward unresolved placeholders
 category: agent
 inference_capable: true

@@ -18,7 +18,7 @@ CONTAINER_HOME = "/sandbox"
 AGENTS: dict[str, dict[str, Any]] = {
     "codex": {
         "executable": "codex",
-        "providers": ["openai"],
+        "providers": ["exoshell-codex"],
     },
     "claude": {
         "executable": "claude",

@@ -1,6 +1,8 @@
 # OpenCode with provider-backed OpenAI authentication.
-id: opencode-openai
-display_name: OpenCode (OpenAI)
+id: exoshell-opencode-openai
+annotations:
+  exoshell-origin: ExOShell
+display_name: ExOShell OpenCode (OpenAI)
 description: OpenCode agent CLI using OpenAI; inference bodies may contain opaque placeholders
 category: agent
 inference_capable: true

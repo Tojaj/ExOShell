@@ -1,7 +1,9 @@
 # Network grant only: the ExOShell base image does not install Cargo. Adjust
 # the Cargo binary paths to match the image used by the sandbox before import.
-id: cargo-crates
-display_name: Cargo crates
+id: exoshell-cargo-crates-ro
+annotations:
+  exoshell-origin: ExOShell
+display_name: ExOShell Cargo crates (read-only)
 description: Official Cargo index, crate artifacts and read-only crate metadata
 category: data
 endpoints:

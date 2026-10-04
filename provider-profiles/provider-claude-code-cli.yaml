@@ -1,6 +1,8 @@
 # Claude Code with provider-backed Anthropic API-key authentication.
-id: claude-code-cli
-display_name: Claude Code (CLI)
+id: exoshell-claude-code-cli
+annotations:
+  exoshell-origin: ExOShell
+display_name: ExOShell Claude Code (CLI)
 description: Claude Code CLI using the Anthropic API; inference bodies may contain opaque placeholders
 category: agent
 inference_capable: true

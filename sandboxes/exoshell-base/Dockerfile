@@ -57,7 +57,7 @@ RUN npm install -g "@googleworkspace/cli@${GWS_VERSION}" \
     && npm cache clean --force
 
 # Overlay newer Codex on the same npm layout as community `base`.
-# `_provider_openai` allows /usr/bin/codex, /usr/local/bin/codex, and
+# The `exoshell-codex-cli` profile allows /usr/bin/codex, /usr/local/bin/codex, and
 # /usr/lib/node_modules/@openai/** (resolved exe path, not the PATH shim).
 RUN npm install -g "@openai/codex@${CODEX_VERSION}" \
     && npm cache clean --force

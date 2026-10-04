@@ -1,7 +1,9 @@
 # Anonymous PyPI package indexes and artifacts only (no interpreter installers
 # or Git sources). Python in the image resolves into uv's managed interpreter.
-id: pypi-packages
-display_name: PyPI packages
+id: exoshell-pypi-packages-ro
+annotations:
+  exoshell-origin: ExOShell
+display_name: ExOShell PyPI packages (read-only)
 description: Python package metadata and downloads from the official PyPI hosts
 category: data
 endpoints:

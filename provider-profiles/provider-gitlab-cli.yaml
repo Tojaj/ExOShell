@@ -1,6 +1,6 @@
 # Custom provider profile: GitLab CLI (gitlab.com instance).
 #
-# This profile follows the same pattern as github-cli: it carries REST + git
+# This profile follows the same pattern as exoshell-github-cli: it carries REST + git
 # transport endpoints and credential binding, but omits the /api/graphql
 # endpoint. The GraphQL endpoint is declared in user policy (policy.yaml)
 # so overlays can control GraphQL mutation access on demand.
@@ -33,8 +33,10 @@
 # gitlab_com_graphql network policy (protocol: graphql) for gitlab.com:443.
 # Without it, POST /api/graphql is parsed as REST, matched by the read-only
 # REST preset, and denied.
-id: gitlab-cli
-display_name: GitLab (CLI, no /api/graphql endpoint)
+id: exoshell-gitlab-cli
+annotations:
+  exoshell-origin: ExOShell
+display_name: ExOShell GitLab (CLI, no /api/graphql endpoint)
 description: >-
   GitLab API and git HTTPS for gitlab.com. Credential binding only —
   /api/graphql is declared in sandbox policy so overlays can control GraphQL

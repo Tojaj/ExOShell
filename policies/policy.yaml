@@ -70,8 +70,8 @@ network_policies:
 
   # The ONE /graphql endpoint for api.github.com.
   #
-  # This must stay in this file (or any --policy file used with the github-cli
-  # provider profile). The github-cli profile deliberately omits its /graphql
+  # This must stay in this file (or any --policy file used with the exoshell-github-cli
+  # provider profile). The exoshell-github-cli profile deliberately omits its /graphql
   # endpoint so overlays can replace it wholesale. A second /graphql entry
   # intersects with this one, so the stricter rule always wins. Keeping the
   # endpoint here lets `apply.py --revert` drop back to read-only instantly.
@@ -99,7 +99,7 @@ network_policies:
 
   # The ONE /api/graphql endpoint for gitlab.com.
   #
-  # The gitlab-cli provider profile omits /api/graphql so overlays can replace
+  # The exoshell-gitlab-cli provider profile omits /api/graphql so overlays can replace
   # it wholesale. Baseline is read-only (queries only). Unlike GitHub, glab
   # issue/MR commands use REST; GraphQL is used by `glab api graphql` and
   # `glab workitems list`.
@@ -141,7 +141,7 @@ network_policies:
       # Shared model metadata; inference API hosts are enforced by providers.
       - { host: models.dev, port: 443, protocol: rest, enforcement: audit, access: full }
 
-      # gitlab.com: audit until --provider glab-com is attached. When it is
+      # gitlab.com: audit until --provider exoshell-gitlab is attached. When it is
       # attached, remove the gitlab.com and **.gitlab.com rows: the provider's
       # enforce endpoint on gitlab.com:443 (specificity 0) conflicts with audit
       # at the same specificity. gitlab_com_graphql (specificity 12) is fine.
@@ -152,10 +152,10 @@ network_policies:
       - { host: mirror.openshift.com, port: 443, protocol: rest, enforcement: audit, access: full }
 
       # Google Workspace CLI (gws): discovery + per-service APIs + OAuth.
-      # **.googleapis.com overlaps oauth2.googleapis.com, which the gws-oauth
+      # **.googleapis.com overlaps oauth2.googleapis.com, which the exoshell-gws-cli
       # provider enforces with request_body_credential_rewrite. Enumerate
       # per-service subdomains instead (the provider owns oauth2).
-      # The gws-oauth provider also owns accounts.google.com/o/oauth2/token;
+      # The exoshell-gws-cli provider also owns accounts.google.com/o/oauth2/token;
       # its exact path takes precedence over the google.com audit wildcard.
       - { host: google.com, port: 443, protocol: rest, enforcement: audit, access: full }
       - { host: "**.google.com", port: 443, protocol: rest, enforcement: audit, access: full }

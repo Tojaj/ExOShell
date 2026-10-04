@@ -13,7 +13,7 @@ Run the read-only checker from the repository root:
 python3 .agents/skills/bump-exoshell-base-versions/scripts/check_versions.py
 ```
 
-When running inside an OpenShell sandbox, attach the optional `ghcr-registry`
+When running inside an OpenShell sandbox, attach the optional `exoshell-ghcr-registry-ro`
 provider to let the checker validate the `uv` source image on GHCR.
 
 Use `--lag 1` or `--lag 2` when the user wants a cooling-off window. The checker reports every version ARG in `sandboxes/exoshell-base/Dockerfile`, including `AST_GREP_VERSION`, with its pin, stable candidate, release date when available, source, and errors. Claude Code uses only the native `stable` channel; lagged releases are unavailable. The `oc` candidate stays in the pinned minor stream and newer streams appear in the note. A candidate older than the pin is for information only; never downgrade automatically.

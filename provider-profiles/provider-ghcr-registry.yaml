@@ -1,7 +1,9 @@
 # Anonymous GHCR reads for agents, OCI tools, and the base-image version checker.
 # Python may resolve to a uv-managed interpreter inside the sandbox.
-id: ghcr-registry
-display_name: GHCR registry (read-only)
+id: exoshell-ghcr-registry-ro
+annotations:
+  exoshell-origin: ExOShell
+display_name: ExOShell GHCR registry (read-only)
 description: Public OCI image and artifact metadata and downloads from ghcr.io
 category: data
 endpoints:

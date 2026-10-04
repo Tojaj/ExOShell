@@ -94,9 +94,9 @@ The image includes these command-line tools:
 Package installation and downloads require an attached
 [package registry provider](../../providers.md#opt-in-package-registries).
 In particular, `uvx` cannot fetch Python MCP dependencies from PyPI without
-the `pypi-packages` provider. Go and Cargo are not installed in this image.
+the `exoshell-pypi-packages-ro` provider. Go and Cargo are not installed in this image.
 Public image inspection and downloads with `skopeo` or `oras` require the
-matching `ghcr-registry`, `dockerhub-registry`, or `quay-registry` provider.
+matching `exoshell-ghcr-registry-ro`, `exoshell-dockerhub-registry-ro`, or `exoshell-quay-registry-ro` provider.
 Skopeo uses the distribution package version. Rebuild the base and derived
 image layers to add it to existing installations.
 

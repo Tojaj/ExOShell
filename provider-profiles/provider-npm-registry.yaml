@@ -1,7 +1,9 @@
 # Anonymous npm registry access. npm's JavaScript launcher runs as node;
 # OpenShell matches the resolved executable and its ancestors, not argv[0].
-id: npm-registry
-display_name: npm registry (read and audit)
+id: exoshell-npm-registry-ro
+annotations:
+  exoshell-origin: ExOShell
+display_name: ExOShell npm registry (read and audit; read-only consumption)
 description: npm package metadata, search, downloads and narrowly scoped audit requests
 category: data
 endpoints:
