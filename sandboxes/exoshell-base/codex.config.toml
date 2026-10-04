@@ -3,6 +3,7 @@
 # Codex loads the installed copy at /etc/codex/config.toml below command-line,
 # project, profile, user, and cloud-managed configuration. Keep credentials
 # and machine-specific settings out of this file.
+# The image build prepends developer_instructions from agent-instructions/.
 
 model_reasoning_effort = "high"
 sandbox_mode = "danger-full-access"

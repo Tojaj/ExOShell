@@ -1,5 +1,6 @@
 ---
-status: accepted
+status: superseded
+superseded-by: adr0032-shared-image-agent-instructions.md
 date: 2026-09-25
 author: Tomas Mlcoch
 topics:
@@ -8,6 +9,9 @@ topics:
 ---
 
 # 22. Bake operational instructions into the OpenCode image
+
+Superseded by [ADR-0032](adr0032-shared-image-agent-instructions.md), which
+shares the instruction sources across Codex, Claude Code, and OpenCode.
 
 ## Context
 

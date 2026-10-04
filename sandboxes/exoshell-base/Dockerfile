@@ -160,12 +160,14 @@ ENV GLAB_CONFIG_DIR=/etc/glab-cli \
 # cached package installs or downloaded CLI binaries.
 # System-level Codex defaults are independent of disposable user state.
 COPY --chmod=0644 codex.config.toml /etc/codex/config.toml
+COPY --chmod=0644 agent-instructions/ /etc/exoshell/instructions/
+COPY --chmod=0644 render-agent-instructions.py /usr/local/lib/exoshell/render-agent-instructions.py
+RUN python3 /usr/local/lib/exoshell/render-agent-instructions.py
 COPY --chmod=0755 exoshell-agent /usr/local/bin/exoshell-agent
 # Global defaults keep the image-pinned OpenCode version from updating while
 # allowing project configuration to override them.
 COPY --chown=sandbox:sandbox --chmod=0644 opencode.json /sandbox/.config/opencode/opencode.json
 COPY --chown=sandbox:sandbox --chmod=0644 tui.json /sandbox/.config/opencode/tui.json
-COPY --chown=sandbox:sandbox --chmod=0644 opencode-instructions/ /sandbox/.config/opencode/instructions/
 # Keep Claude's mutable user configuration within the writable agent directory.
 # Atlassian is registered by exoshell-agent only with a provider credential.
 ENV CLAUDE_CONFIG_DIR=/sandbox/.claude

@@ -2,9 +2,9 @@
   "$schema": "https://opencode.ai/config.json",
   "autoupdate": false,
   "instructions": [
-    "/sandbox/.config/opencode/instructions/openshell-sandbox.md",
-    "/sandbox/.config/opencode/instructions/selinux-bind-mount-labels.md",
-    "/sandbox/.config/opencode/instructions/search-tools.md"
+    "/etc/exoshell/instructions/openshell-sandbox.md",
+    "/etc/exoshell/instructions/search-tools.md",
+    "/etc/exoshell/instructions/selinux-bind-mount-labels.md"
   ],
   "mcp": {
     "atlassian": {

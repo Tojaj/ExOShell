@@ -105,10 +105,24 @@ defaults are copied to `/etc/codex/config.toml`; OpenCode automatic updates are
 disabled by global `/sandbox/.config/opencode/opencode.json` configuration.
 Projects can override those OpenCode defaults with their own `opencode.json`.
 TUI settings are in `/sandbox/.config/opencode/tui.json`; projects can override
-them with their own `tui.json`. Small, sandbox-specific OpenCode instructions
-for operational issues and image-provided tools are baked into
-`/sandbox/.config/opencode/instructions/` and listed explicitly by the global
-configuration.
+them with their own `tui.json`.
+
+Small, sandbox-specific instructions for operational issues and image-provided
+tools live in `agent-instructions/`. The image installs them as root-owned,
+readable files under `/etc/exoshell/instructions/`. At build time,
+`render-agent-instructions.py` combines the Markdown files in filename order
+and adds the content to Codex's top-level `developer_instructions` in
+`/etc/codex/config.toml` and Claude's managed `/etc/claude-code/CLAUDE.md`.
+OpenCode lists the individual installed files explicitly in its global
+configuration. Add new files to that list as well as the source directory.
+
+These instructions load for direct agent launches as well as launches through
+`exoshell-agent`, independently of `CODEX_HOME` and `CLAUDE_CONFIG_DIR`.
+Codex treats them as developer instructions; higher-precedence configuration
+can replace the entire value. Claude's managed memory supplies behavioral
+guidance, not technical enforcement. Rebuild the base and derived images after
+changing the sources. See [ADR-0032](../../adrs/adr0032-shared-image-agent-instructions.md)
+and [derived-image instructions](../../CUSTOMIZATION.md#shared-agent-instructions).
 
 Atlassian MCP is disabled by default. `exoshell-agent` enables it at startup
 only with a non-empty provider credential placeholder. Runtime overrides

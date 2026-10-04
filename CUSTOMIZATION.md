@@ -133,6 +133,42 @@ For a remote gateway, push the image to a registry the gateway can access and
 use that fully qualified image reference. OpenShell does not build a Dockerfile
 passed to `--from`; build and tag the image first.
 
+### Shared agent instructions
+
+The base image keeps operational guidance under `/etc/exoshell/instructions/`.
+At build time, it combines all top-level `*.md` files in filename order into
+Codex's `developer_instructions` in `/etc/codex/config.toml` and Claude's
+`/etc/claude-code/CLAUDE.md`. OpenCode references the individual files through
+its global `instructions` list. See [ADR-0032](adrs/adr0032-shared-image-agent-instructions.md).
+
+To add organization-specific guidance in a derived image, install additional
+Markdown files, copy a fresh Codex configuration template without
+`developer_instructions`, and rerun the installed build helper as root:
+
+```dockerfile
+USER root
+COPY --chmod=0644 agent-instructions/ /etc/exoshell/instructions/
+COPY --chmod=0644 codex.config.toml /etc/codex/config.toml
+RUN python3 /usr/local/lib/exoshell/render-agent-instructions.py
+USER sandbox
+```
+
+Start the fresh Codex template from the base image's source
+`sandboxes/exoshell-base/codex.config.toml`, preserving its existing defaults
+and disabled Atlassian MCP entry. The helper rejects a template that already
+contains `developer_instructions`; copying the generated configuration from
+a running image is unsuitable. It writes the complete combined content to
+both agents' system files. Rebuild every dependent image after changes.
+
+For OpenCode, also update the global `instructions` list to include every
+installed Markdown file, retaining the base files and unrelated settings.
+Editing Markdown alone does not refresh Codex or Claude's generated content.
+Higher-precedence Codex configuration can replace `developer_instructions`
+as a whole; it does not append to the image's value. These instructions have
+developer-level priority over project guidance. Claude's managed memory
+cannot be excluded through `claudeMdExcludes`, but remains behavioral guidance
+rather than technical enforcement.
+
 ### Private CA for inspected Podman HTTPS egress
 
 On OpenShell 0.1.2, Podman runs the network supervisor in a separate container.

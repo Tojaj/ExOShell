@@ -29,6 +29,16 @@ ADR-0025. Private trust roots and extra client defaults belong in derived images
 On OpenShell 0.1.2, inspected egress uses a separate supervisor container;
 CUSTOMIZATION.md and ADR-0026 document its trust configuration.
 
+Shared operational guidance lives in the base image's `agent-instructions/`
+and is installed under `/etc/exoshell/instructions/`. The build combines the
+Markdown files in filename order into Codex's `developer_instructions` in
+`/etc/codex/config.toml` and Claude's managed `/etc/claude-code/CLAUDE.md`.
+OpenCode's global configuration lists the individual installed files. This
+guidance applies to direct agent launches and requires an image rebuild to
+change. Higher-precedence Codex configuration can replace the combined value;
+Claude managed memory is behavioral guidance rather than enforcement. See
+ADR-0032 and CUSTOMIZATION.md for derived-image regeneration.
+
 ## 3. Launcher and filesystem
 
 `run-exoshell-agent.sh` delegates to the Python launcher. Python 3.11 or newer
