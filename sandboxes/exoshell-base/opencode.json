@@ -2,6 +2,7 @@
   "$schema": "https://opencode.ai/config.json",
   "autoupdate": false,
   "instructions": [
+    "/sandbox/.config/opencode/instructions/openshell-sandbox.md",
     "/sandbox/.config/opencode/instructions/selinux-bind-mount-labels.md",
     "/sandbox/.config/opencode/instructions/search-tools.md"
   ],
