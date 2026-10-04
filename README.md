@@ -1,3 +1,13 @@
+<!-- markdownlint-disable MD033 MD041 -->
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/brand/assets/ExOShell-dark.jpg">
+  <source media="(prefers-color-scheme: light)" srcset="docs/brand/assets/ExOShell-light.jpg">
+  <img alt="ExOShell" src="docs/brand/assets/ExOShell-light.jpg" width="430">
+</picture>
+
+<!-- markdownlint-enable MD033 MD041 -->
+
 # ExOShell
 
 https://github.com/Tojaj/ExOShell
