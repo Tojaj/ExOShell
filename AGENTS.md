@@ -36,3 +36,7 @@ Load `./AGENTS.local.md` if available for local specific guidance.
 
 Include `Assisted-by: AGENT_NAME:MODEL_VERSION` in commit messages and pull
 request descriptions, using the actual tool and model version.
+
+## Contributing
+
+Read CONTRIBUTING.md when you are about to contribute (commit, etc.).
