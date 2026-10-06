@@ -107,6 +107,17 @@ Projects can override those OpenCode defaults with their own `opencode.json`.
 TUI settings are in `/sandbox/.config/opencode/tui.json`; projects can override
 them with their own `tui.json`.
 
+`exoshell-agent` prepares Codex authentication before starting the requested
+Codex command. With a non-empty `OPENAI_API_KEY`, it runs
+`codex login --with-api-key` and supplies the attached provider's placeholder
+through stdin, refreshing the login on each launch. Codex stores that value in
+`CODEX_HOME/auth.json` (normally `/sandbox/.codex/auth.json`) with private
+permissions; the real provider key remains outside the sandbox. Login failure
+stops startup without printing captured output. Without the environment value,
+Codex uses its normal login flow. Bare commands can reuse the prepared login
+but do not initialize it themselves. Rebuild the base and all derived image
+layers to enable this behavior. See [ADR-0033](../../adrs/adr0033-provider-backed-codex-login.md).
+
 Small, sandbox-specific instructions for operational issues and image-provided
 tools live in `agent-instructions/`. The image installs them as root-owned,
 readable files under `/etc/exoshell/instructions/`. At build time,

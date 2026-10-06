@@ -88,6 +88,15 @@ selected baseline. PyYAML is required by `policy-overlays/apply.py`.
 
 ## 5. Optional integrations and lifecycle
 
+Before starting Codex, the image helper runs `codex login --with-api-key`
+when `OPENAI_API_KEY` is non-empty, supplying the current provider placeholder
+through stdin. Each helper invocation refreshes the saved login; failure stops
+startup without forwarding login output. Without a key, Codex retains its
+normal login behavior. The image defaults to file-based credential storage
+under `CODEX_HOME` (normally `/sandbox/.codex`); this state is discarded with
+the sandbox. Bare Codex commands bypass initialization but can reuse the saved
+login. See [ADR-0033](adrs/adr0033-provider-backed-codex-login.md).
+
 A kubeconfig can be mounted read-only; its credentials remain readable inside
 the sandbox. Google Workspace initialization instead writes provider-backed
 placeholders to a private credentials file in tmpfs. The launcher always

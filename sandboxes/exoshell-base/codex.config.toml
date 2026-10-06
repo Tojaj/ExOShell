@@ -8,6 +8,8 @@
 model_reasoning_effort = "high"
 sandbox_mode = "danger-full-access"
 approval_policy = "on-request"
+# Cache the runtime provider placeholder in disposable sandbox state.
+cli_auth_credentials_store = "file"
 
 [mcp_servers.atlassian]
 enabled = false

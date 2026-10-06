@@ -4,6 +4,7 @@
 import json
 import os
 from pathlib import Path
+import subprocess
 import sys
 import tempfile
 
@@ -25,6 +26,24 @@ def object_field(config: dict, key: str) -> dict:
     if not isinstance(value, dict):
         fail(f"MCP configuration field '{key}' must be an object")
     return value
+
+
+def initialize_codex_auth(command: list[str], environment: dict[str, str], project: Path) -> None:
+    """Cache the current provider credential before starting the Codex session."""
+    credential = environment.get("OPENAI_API_KEY")
+    if Path(command[0]).name != "codex" or not credential:
+        return
+    try:
+        result = subprocess.run(
+            [command[0], "login", "--with-api-key"],
+            input=credential.encode("utf-8"), capture_output=True,
+            env=environment, cwd=project,
+        )
+    except (OSError, UnicodeError):
+        fail("could not initialize Codex API-key login")
+    if result.returncode != 0:
+        # Login diagnostics can contain credential material; never forward them.
+        fail("could not initialize Codex API-key login")
 
 
 def initialize_claude_mcp(environment: dict[str, str], project: Path, enabled: bool,
@@ -166,6 +185,7 @@ def main(arguments: list[str]) -> None:
     environment = os.environ.copy()
     command = initialize_atlassian_mcp(arguments[2:], environment, project)
     initialize_gws(environment)
+    initialize_codex_auth(command, environment, project)
     try:
         os.chdir(project)
     except OSError:
