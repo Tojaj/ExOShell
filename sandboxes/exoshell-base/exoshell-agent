@@ -123,6 +123,27 @@ def initialize_atlassian_mcp(command: list[str], environment: dict[str, str], pr
     return command
 
 
+def initialize_opencode_defaults(command: list[str], environment: dict[str, str]) -> None:
+    """Merge interactive model/variant defaults into disposable inline config."""
+    defaults_text = environment.pop("EXOSHELL_OPENCODE_DEFAULTS", None)
+    if Path(command[0]).name != "opencode" or defaults_text is None:
+        return
+    try:
+        defaults = json.loads(defaults_text)
+        if (not isinstance(defaults, dict) or set(defaults) != {"model", "variant"}
+                or any(not isinstance(value, str) or not value.strip() for value in defaults.values())):
+            fail("EXOSHELL_OPENCODE_DEFAULTS must contain non-empty model and variant strings")
+        config = json.loads(environment.get("OPENCODE_CONFIG_CONTENT") or "{}")
+        if not isinstance(config, dict):
+            fail("OPENCODE_CONFIG_CONTENT must be a JSON object")
+        agents = object_field(config, "agent")
+        for name in ("build", "plan"):
+            object_field(agents, name).update(defaults)
+        environment["OPENCODE_CONFIG_CONTENT"] = json.dumps(config)
+    except (ValueError, TypeError):
+        fail("could not prepare OpenCode model defaults")
+
+
 def initialize_gws(environment: dict[str, str], directory: Path = GWS_DIR) -> None:
     """Initialize from provider credentials; a partial environment is an error."""
     if not any(environment.get(key) for key in GWS_KEYS):
@@ -183,6 +204,7 @@ def main(arguments: list[str]) -> None:
         fail("PROJECT must be a directory below /workspace")
 
     environment = os.environ.copy()
+    initialize_opencode_defaults(arguments[2:], environment)
     command = initialize_atlassian_mcp(arguments[2:], environment, project)
     initialize_gws(environment)
     initialize_codex_auth(command, environment, project)

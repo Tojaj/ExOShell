@@ -41,8 +41,10 @@ DEFAULTS: dict[str, Any] = {
     "github_host": None,
     "gitlab_host": None,
     "keep": False,
+    "model": None,
+    "effort": None,
 }
-CONFIG_KEYS = (set(DEFAULTS) - {"keep"}) | {"agents", "host_share"}
+CONFIG_KEYS = (set(DEFAULTS) - {"keep", "model", "effort"}) | {"agents", "host_share"}
 PATH_KEYS = {"host_share", "policy", "kubeconfig"}
 HOST_RE = re.compile(
     r"(?=.{1,253}\Z)(?:[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?)"
@@ -70,6 +72,13 @@ def parser(*, prog: str = "run-exoshell-agent.sh") -> argparse.ArgumentParser:
         ),
     )
     result.add_argument("--agent", choices=AGENTS, help="coding agent (default: codex)")
+    for key in ("model", "effort"):
+        group = result.add_mutually_exclusive_group()
+        group.add_argument(f"--{key}", help=f"starting agent {key} (overrides per-agent config)")
+        group.add_argument(
+            f"--no-{key}", action="store_true",
+            help=f"ignore the configured {key}; use native agent defaults",
+        )
     result.add_argument(
         "--config", type=Path,
         help="TOML file (any filename; relative to caller's directory; bypasses discovery)",
@@ -194,13 +203,20 @@ def load_config(path: Path, *, required: bool) -> dict[str, Any]:
             for agent, agent_config in value.items():
                 if not isinstance(agent_config, dict):
                     raise LauncherError(f"configuration key 'agents.{agent}' must be a table")
-                unknown_agent_keys = sorted(set(agent_config) - {"providers"})
+                unknown_agent_keys = sorted(set(agent_config) - {"providers", "model", "effort"})
                 if unknown_agent_keys:
                     raise LauncherError(
                         f"unknown configuration key(s) for agents.{agent}: {', '.join(unknown_agent_keys)}"
                     )
                 if "providers" in agent_config:
                     _provider_list(agent_config["providers"], f"agents.{agent}.providers")
+                for setting in ("model", "effort"):
+                    if setting in agent_config:
+                        selected = agent_config[setting]
+                        if type(selected) is not str or not selected.strip():
+                            raise LauncherError(
+                                f"configuration key 'agents.{agent}.{setting}' must be a non-empty string"
+                            )
         elif key == "agent":
             if type(value) is not str or value not in AGENTS:
                 raise LauncherError(f"configuration key 'agent' must be one of: {', '.join(AGENTS)}")
@@ -228,6 +244,14 @@ def resolve_settings(args: argparse.Namespace, config: dict[str, Any], *, cwd: P
     settings = {**DEFAULTS, **config}
     if args.agent is not None:
         settings["agent"] = args.agent
+    selected_agent = config.get("agents", {}).get(settings["agent"], {})
+    for key in ("model", "effort"):
+        value = getattr(args, key)
+        if value is not None and not value.strip():
+            raise LauncherError(f"--{key} cannot be empty")
+        settings[key] = None if getattr(args, f"no_{key}") else (
+            value if value is not None else selected_agent.get(key)
+        )
     if args.image is not None:
         if not args.image:
             raise LauncherError("--image cannot be empty")
@@ -364,6 +388,8 @@ def git_identity(project: Path) -> tuple[str, str]:
 
 def environment_args(settings: dict[str, Any], name: str, email: str) -> list[str]:
     environment = ["UV_CACHE_DIR=/tmp/uv-cache"]
+    if settings.get("opencode_defaults") is not None:
+        environment.append("EXOSHELL_OPENCODE_DEFAULTS=" + json.dumps(settings["opencode_defaults"]))
     environment.extend(
         [
             f"GIT_AUTHOR_NAME={name}",
@@ -402,6 +428,82 @@ def environment_args(settings: dict[str, Any], name: str, email: str) -> list[st
     return result
 
 
+def native_option(arguments: Sequence[str], *names: str) -> str | None:
+    """Read native overrides before a literal --, including --name=value."""
+    for index, argument in enumerate(arguments):
+        if argument == "--":
+            break
+        for name in names:
+            if argument == name:
+                return arguments[index + 1] if index + 1 < len(arguments) else ""
+            if argument.startswith(name + "="):
+                return argument[len(name) + 1:]
+            if len(name) == 2 and argument.startswith(name) and len(argument) > 2:
+                return argument[2:]
+    return None
+
+
+def opencode_run_index(arguments: Sequence[str]) -> int | None:
+    """Locate run after native global options, without treating option values as commands."""
+    value_options = {
+        "--model", "-m", "--agent", "--log-level", "--port", "--hostname",
+        "--mdns-domain", "--cors", "--session", "-s", "--prompt", "--replay-limit",
+    }
+    index = 0
+    while index < len(arguments):
+        argument = arguments[index]
+        if argument == "--":
+            return None
+        if argument in value_options:
+            index += 2
+            continue
+        if not argument.startswith("-"):
+            return index if argument == "run" else None
+        index += 1
+    return None
+
+
+def agent_command(settings: dict[str, Any], arguments: Sequence[str]) -> tuple[list[str], dict[str, Any]]:
+    """Translate launcher defaults without modifying forwarded arguments."""
+    agent = settings["agent"]
+    model, effort = settings.get("model"), settings.get("effort")
+    defaults: list[str] = []
+    environment_settings = dict(settings)
+    model_options = ("--model",) if agent == "claude" else ("--model", "-m")
+    native_model = native_option(arguments, *model_options)
+    if agent == "codex":
+        # Config overrides are repeatable and lower precedence than --model.
+        if model is not None and native_model is None:
+            defaults.extend(["--config", "model=" + json.dumps(model, ensure_ascii=False)])
+        if effort is not None:
+            defaults.extend(["--config", "model_reasoning_effort=" + json.dumps(effort, ensure_ascii=False)])
+    elif agent == "claude":
+        for key, value in (("model", model), ("effort", effort)):
+            if value is not None and native_option(arguments, f"--{key}") is None:
+                defaults.extend([f"--{key}", value])
+    else:
+        if model is not None and native_model is None:
+            defaults.extend(["--model", model])
+        # The run command supports --variant; the TUI uses agent configuration.
+        run_index = opencode_run_index(arguments)
+        if effort is not None:
+            effective_model = native_model if native_model is not None else model
+            if not effective_model:
+                raise LauncherError(
+                    "OpenCode effort requires an explicit model; set agents.opencode.model or use --model"
+                )
+            if run_index is not None:
+                if native_option(arguments, "--variant") is None:
+                    # Run-only options must follow the subcommand.
+                    return [
+                        "opencode", *defaults, *arguments[:run_index + 1],
+                        "--variant", effort, *arguments[run_index + 1:],
+                    ], environment_settings
+            else:
+                environment_settings["opencode_defaults"] = {"model": effective_model, "variant": effort}
+    return [AGENTS[agent]["executable"], *defaults, *arguments], environment_settings
+
+
 def create_command(settings: dict[str, Any], agent_args: Sequence[str], name: str, email: str) -> list[str]:
     """Build the complete OpenShell sandbox creation command."""
     command = ["openshell", "sandbox", "create", "--from", settings["image"]]
@@ -417,12 +519,13 @@ def create_command(settings: dict[str, Any], agent_args: Sequence[str], name: st
         command.extend(["--provider", provider])
     if settings["policy"] is not None:
         command.extend(["--policy", str(settings["policy"])])
-    command.extend(environment_args(settings, name, email))
+    selected_command, environment_settings = agent_command(settings, agent_args)
+    command.extend(environment_args(environment_settings, name, email))
     command.append("--driver-config-json=" + json.dumps(mount_config(settings), separators=(",", ":")))
     command.extend(
         [
             "--", "/usr/local/bin/exoshell-agent", settings["container_project"], "--",
-            AGENTS[settings["agent"]]["executable"], *agent_args,
+            *selected_command,
         ]
     )
     return command
@@ -454,9 +557,10 @@ def run(argv: Sequence[str], *, cwd: Path) -> int:
     elif args.verbose:
         _verbose_value("config", "built-in defaults")
     settings = resolve_settings(args, config, cwd=cwd)
+    agent_command(settings, agent_args)  # Validate before image checks or provisioning.
     if args.verbose:
         for key in (
-            "agent", "image", "providers", "policy", "kubeconfig", "github_host",
+            "agent", "model", "effort", "image", "providers", "policy", "kubeconfig", "github_host",
             "gitlab_host", "keep", "host_share", "project", "container_project",
         ):
             _verbose_value(key, settings[key])

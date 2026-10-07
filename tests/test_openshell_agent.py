@@ -340,6 +340,7 @@ class DiscoveryTests(unittest.TestCase):
         self.assertEqual(self.verbose_values("--no-policy"), {})
         expected = {
             "config": "built-in defaults", "agent": "codex",
+            "model": None, "effort": None,
             "image": launcher.DEFAULTS["image"], "providers": ["exoshell-codex"],
             "policy": None, "kubeconfig": None, "github_host": None,
             "gitlab_host": None, "keep": False, "host_share": str(self.cwd),
@@ -422,7 +423,7 @@ class DiscoveryTests(unittest.TestCase):
                  mock.patch.object(launcher, "git_identity", side_effect=check_identity), \
                  mock.patch.object(stderr, "flush", wraps=stderr.flush) as flush:
                 self.assertEqual(launcher.run(["-v", "--no-policy"], cwd=self.cwd), 0)
-                self.assertEqual(flush.call_count, 12)
+            self.assertEqual(flush.call_count, 14)
 
 
 class ResolutionTests(unittest.TestCase):

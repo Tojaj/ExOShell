@@ -77,6 +77,23 @@ that checkout; callers elsewhere must use `--config` or move it to the user
 directory. Overlay users must supply the correct `--base-file` explicitly;
 launcher discovery does not determine the helper's baseline. See ADR-0034.
 
+Each agent table also accepts optional non-empty `model` and `effort` strings.
+Only the selected agent's values apply; omitted fields retain native defaults.
+The launcher accepts `--model` and `--effort` overrides and mutually exclusive
+`--no-model` and `--no-effort` options to suppress the respective ExOShell
+setting. Native model/effort options after `--` take precedence and forwarded
+arguments remain unchanged. ExOShell validates string values but delegates
+model availability and effort-level compatibility to the selected agent.
+
+Codex receives TOML-quoted `model` and `model_reasoning_effort` CLI config
+overrides. Claude receives native `--model` and `--effort` options. OpenCode
+uses native model selection; effort requires an explicit effective model.
+Interactive OpenCode startup merges that pair into the built-in `build` and
+`plan` agent entries in `OPENCODE_CONFIG_CONTENT`, preserving unrelated
+configuration and MCP state. Custom agents retain their own variants.
+`opencode run` receives `--variant` instead. These are starting selections
+that users can change during a session. See ADR-0036 and CUSTOMIZATION.md.
+
 The CLI-only `-v` / `--verbose` flag reports the absolute selected configuration
 path before loading it, or identifies built-in defaults when no file is selected.
 After successful settings validation, it reports every effective launcher setting,
@@ -84,6 +101,8 @@ including CLI overrides, composed providers, and resolved project and mount path
 Diagnostics use `exoshell: key = value` lines with JSON values on stderr and are
 flushed before image checks, Git identity lookup, and sandbox creation. File
 contents, environment variables, and forwarded agent arguments are not dumped.
+The model and effort diagnostics report ExOShell's selected values (or `null`),
+without inspecting native overrides or agent configuration.
 
 ## 4. Policies and providers
 
