@@ -52,7 +52,19 @@ must be beneath that share and retains its relative path below `/workspace`.
 Paths are resolved before launch, including symlinks. The image entry point
 validates the container project path and starts the agent there.
 
+The CLI-only `--no-share` option starts the agent in the image's writable
+`/workspace` without launcher-supplied host bind mounts. It clears configured
+`host_share` and `kubeconfig` paths before checking their existence and rejects
+explicit `--host-share`, `--kubeconfig`, or positional project arguments.
+The host project and share are absent; configuration discovery, policy selection,
+providers, and the `/tmp/gws` tmpfs still apply. OpenShell manages its own
+internal storage. See ADR-0037.
+
 The launcher injects the selected project's effective Git name and email.
+With `--no-share`, it reads only global host Git configuration and injects
+identity when both name and email are present. Missing or partial identity
+does not block launch; users can configure Git inside the sandbox. Other Git
+configuration read failures are errors.
 Configured forge hosts select the CLI host, HTTPS URL rewriting, and transient
 Git credential helpers. They do not grant network access or create providers.
 
@@ -98,6 +110,8 @@ The CLI-only `-v` / `--verbose` flag reports the absolute selected configuration
 path before loading it, or identifies built-in defaults when no file is selected.
 After successful settings validation, it reports every effective launcher setting,
 including CLI overrides, composed providers, and resolved project and mount paths.
+The `no_share` diagnostic reports the sharing opt-out; suppressed host project,
+share, and kubeconfig paths are `null`.
 Diagnostics use `exoshell: key = value` lines with JSON values on stderr and are
 flushed before image checks, Git identity lookup, and sandbox creation. File
 contents, environment variables, and forwarded agent arguments are not dumped.
@@ -170,7 +184,9 @@ disposable sandbox workflow; MCP remains supported. See
 OpenShell assigns sandbox names. The launcher adds `managed-by=exoshell`,
 project, and agent labels and passes `--no-keep` by default. Agent state lives
 in the container layer and is discarded at deletion; project files remain on
-the host. `--keep` retains a sandbox for diagnosis and requires later cleanup.
+the host. With `--no-share`, the project label is `ephemeral` and workspace
+files are discarded with the sandbox. `--keep` retains a sandbox for diagnosis
+and requires later cleanup.
 
 ## 6. Customization and validation
 

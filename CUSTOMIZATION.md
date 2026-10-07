@@ -25,6 +25,16 @@ to OpenShell, which may use an environment or inherited image policy rather
 than its restrictive default. See
 [ADR-0035](adrs/adr0035-explicit-launcher-policy-selection.md).
 
+For a disposable workspace, use the CLI-only `--no-share` option. It suppresses
+configured `host_share` and `kubeconfig` paths and starts in the image's writable
+`/workspace`. Explicit mount options or a positional host project conflict with
+this mode. Providers, policy selection, configuration discovery, and forge host
+settings still apply. Git identity uses global host name and email only when
+both are available; otherwise configure Git inside the sandbox. Workspace files
+are discarded on deletion unless `--keep` retains the sandbox. Derived images
+must provide a writable `/workspace`; the standard image already does. See
+[ADR-0037](adrs/adr0037-optional-host-sharing.md).
+
 Discovery uses the caller's directory, independently of the positional
 project and launcher locations. It does not search parents, uppercase aliases,
 or `XDG_CONFIG_DIRS`. Existing checkout configs remain discoverable when

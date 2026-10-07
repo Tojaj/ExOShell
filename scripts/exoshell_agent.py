@@ -94,6 +94,10 @@ def parser(*, prog: str = "run-exoshell-agent.sh") -> argparse.ArgumentParser:
         help="retain the sandbox after the agent exits (for debugging)",
     )
     result.add_argument("--host-share", type=Path, help="host directory mounted at /workspace")
+    result.add_argument(
+        "--no-share", action="store_true",
+        help="use a disposable /workspace without host project or kubeconfig mounts",
+    )
     providers = result.add_mutually_exclusive_group()
     providers.add_argument("--provider", action="append", dest="providers", metavar="NAME")
     providers.add_argument("--no-providers", action="store_true")
@@ -242,6 +246,14 @@ def _reject_duplicates(values: Sequence[str], label: str) -> None:
 def resolve_settings(args: argparse.Namespace, config: dict[str, Any], *, cwd: Path) -> dict[str, Any]:
     """Merge defaults, configuration, and CLI overrides into validated settings."""
     settings = {**DEFAULTS, **config}
+    settings["no_share"] = args.no_share
+    if args.no_share:
+        for option, value in (
+            ("--host-share", args.host_share), ("--kubeconfig", args.kubeconfig),
+            ("a positional project", args.project),
+        ):
+            if value is not None:
+                raise LauncherError(f"--no-share cannot be combined with {option}")
     if args.agent is not None:
         settings["agent"] = args.agent
     selected_agent = config.get("agents", {}).get(settings["agent"], {})
@@ -290,17 +302,22 @@ def resolve_settings(args: argparse.Namespace, config: dict[str, Any], *, cwd: P
         elif getattr(args, key) is not None:
             settings[key] = getattr(args, key)
 
-    project = _resolve_path(args.project or cwd, cwd)
-    host_share = settings.get("host_share")
-    settings["project"] = canonical_directory(project, "project")
-    settings["host_share"] = canonical_directory(
-        _resolve_path(host_share, cwd) if host_share is not None else project, "host share"
-    )
-    try:
-        relative_project = settings["project"].relative_to(settings["host_share"])
-    except ValueError as error:
-        raise LauncherError(f"project {settings['project']} is outside host share {settings['host_share']}") from error
-    settings["container_project"] = str(Path(CONTAINER_WORKSPACE) / relative_project)
+    if args.no_share:
+        settings.update(
+            project=None, host_share=None, kubeconfig=None, container_project=CONTAINER_WORKSPACE,
+        )
+    else:
+        project = _resolve_path(args.project or cwd, cwd)
+        host_share = settings.get("host_share")
+        settings["project"] = canonical_directory(project, "project")
+        settings["host_share"] = canonical_directory(
+            _resolve_path(host_share, cwd) if host_share is not None else project, "host share"
+        )
+        try:
+            relative_project = settings["project"].relative_to(settings["host_share"])
+        except ValueError as error:
+            raise LauncherError(f"project {settings['project']} is outside host share {settings['host_share']}") from error
+        settings["container_project"] = str(Path(CONTAINER_WORKSPACE) / relative_project)
 
     for key in ("policy", "kubeconfig"):
         value = settings[key]
@@ -333,23 +350,27 @@ def canonical_directory(path: Path, label: str) -> Path:
     return resolved
 
 
-def project_label(project: Path) -> str:
+def project_label(project: Path | None) -> str:
     """Normalize a project directory basename for an OpenShell label value."""
+    if project is None:
+        return "ephemeral"
     normalized = re.sub(r"[^a-z0-9]+", "-", project.name.lower()).strip("-")
     return normalized[:63] or "project"
 
 
 def mount_config(settings: dict[str, Any]) -> dict[str, Any]:
     """Build Podman mount configuration for the sandbox."""
-    mounts: list[dict[str, Any]] = [
-        {
-            "type": "bind",
-            "source": str(settings["host_share"]),
-            "target": CONTAINER_WORKSPACE,
-            "read_only": False,
-            "selinux_label": "shared",
-        }
-    ]
+    mounts: list[dict[str, Any]] = []
+    if settings["host_share"] is not None:
+        mounts.append(
+            {
+                "type": "bind",
+                "source": str(settings["host_share"]),
+                "target": CONTAINER_WORKSPACE,
+                "read_only": False,
+                "selinux_label": "shared",
+            }
+        )
     if settings["kubeconfig"] is not None:
         mounts.append(
             {
@@ -365,40 +386,50 @@ def mount_config(settings: dict[str, Any]) -> dict[str, Any]:
     return {"podman": {"mounts": mounts}}
 
 
-def git_identity(project: Path) -> tuple[str, str]:
+def git_identity(project: Path | None) -> tuple[str | None, str | None]:
+    """Read required project identity, or optional global identity without a project."""
+    command = ["git", "config", "--global"] if project is None else ["git", "-C", str(project), "config"]
     values: list[str] = []
     for key in ("user.name", "user.email"):
         try:
             result = subprocess.run(
-                ["git", "-C", str(project), "config", "--get", key],
+                [*command, "--get", key],
                 check=True,
                 capture_output=True,
                 text=True,
             )
         except (FileNotFoundError, subprocess.CalledProcessError) as error:
+            if project is None:
+                if isinstance(error, FileNotFoundError) or error.returncode == 1:
+                    return None, None
+                raise LauncherError(f"cannot read global Git {key}") from error
             raise LauncherError(
                 f"Git {key} is not configured for {project}; configure it locally or globally"
             ) from error
         value = result.stdout.rstrip("\n")
         if not value:
+            if project is None:
+                return None, None
             raise LauncherError(f"Git {key} is empty for {project}")
         values.append(value)
     return values[0], values[1]
 
 
-def environment_args(settings: dict[str, Any], name: str, email: str) -> list[str]:
+def environment_args(settings: dict[str, Any], name: str | None, email: str | None) -> list[str]:
     environment = ["UV_CACHE_DIR=/tmp/uv-cache"]
     if settings.get("opencode_defaults") is not None:
         environment.append("EXOSHELL_OPENCODE_DEFAULTS=" + json.dumps(settings["opencode_defaults"]))
-    environment.extend(
-        [
-            f"GIT_AUTHOR_NAME={name}",
-            f"GIT_AUTHOR_EMAIL={email}",
-            f"GIT_COMMITTER_NAME={name}",
-            f"GIT_COMMITTER_EMAIL={email}",
-        ]
-    )
-    git_config = [("user.name", name), ("user.email", email)]
+    git_config: list[tuple[str, str]] = []
+    if name is not None and email is not None:
+        environment.extend(
+            [
+                f"GIT_AUTHOR_NAME={name}",
+                f"GIT_AUTHOR_EMAIL={email}",
+                f"GIT_COMMITTER_NAME={name}",
+                f"GIT_COMMITTER_EMAIL={email}",
+            ]
+        )
+        git_config.extend([("user.name", name), ("user.email", email)])
     if settings["kubeconfig"] is not None:
         environment.append(f"KUBECONFIG={CONTAINER_HOME}/.kube/config")
     if settings["github_host"] is not None:
@@ -504,7 +535,9 @@ def agent_command(settings: dict[str, Any], arguments: Sequence[str]) -> tuple[l
     return [AGENTS[agent]["executable"], *defaults, *arguments], environment_settings
 
 
-def create_command(settings: dict[str, Any], agent_args: Sequence[str], name: str, email: str) -> list[str]:
+def create_command(
+    settings: dict[str, Any], agent_args: Sequence[str], name: str | None, email: str | None,
+) -> list[str]:
     """Build the complete OpenShell sandbox creation command."""
     command = ["openshell", "sandbox", "create", "--from", settings["image"]]
     if not settings["keep"]:
@@ -561,7 +594,7 @@ def run(argv: Sequence[str], *, cwd: Path) -> int:
     if args.verbose:
         for key in (
             "agent", "model", "effort", "image", "providers", "policy", "kubeconfig", "github_host",
-            "gitlab_host", "keep", "host_share", "project", "container_project",
+            "gitlab_host", "keep", "no_share", "host_share", "project", "container_project",
         ):
             _verbose_value(key, settings[key])
     if is_local_image(settings["image"]):

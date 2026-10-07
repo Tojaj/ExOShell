@@ -50,6 +50,7 @@ class ConfigTests(unittest.TestCase):
             "removed-sandbox-name": 'sandbox_name = "fixed"\n',
             "removed-gws-true": "gws = true\n",
             "removed-gws-false": "gws = false\n",
+            "cli-only-no-share": "no_share = true\n",
             "agent": 'agent = "other"\n',
             "agent-type": "agent = []\n",
             "unknown-agent": "[agents.other]\nproviders = []\n",
@@ -343,7 +344,7 @@ class DiscoveryTests(unittest.TestCase):
             "model": None, "effort": None,
             "image": launcher.DEFAULTS["image"], "providers": ["exoshell-codex"],
             "policy": None, "kubeconfig": None, "github_host": None,
-            "gitlab_host": None, "keep": False, "host_share": str(self.cwd),
+            "gitlab_host": None, "keep": False, "no_share": False, "host_share": str(self.cwd),
             "project": str(self.cwd), "container_project": "/workspace",
         }
         for arguments in (("-v",), ("--verbose",), ("-v", "--verbose")):
@@ -423,7 +424,7 @@ class DiscoveryTests(unittest.TestCase):
                  mock.patch.object(launcher, "git_identity", side_effect=check_identity), \
                  mock.patch.object(stderr, "flush", wraps=stderr.flush) as flush:
                 self.assertEqual(launcher.run(["-v", "--no-policy"], cwd=self.cwd), 0)
-            self.assertEqual(flush.call_count, 14)
+            self.assertEqual(flush.call_count, 15)
 
 
 class ResolutionTests(unittest.TestCase):
@@ -527,6 +528,101 @@ class ResolutionTests(unittest.TestCase):
                 launcher.resolve_settings(
                     self.parse("--host-share", str(share), str(project)), {}, cwd=root
                 )
+
+
+class NoShareTests(unittest.TestCase):
+    def setUp(self) -> None:
+        temporary = tempfile.TemporaryDirectory()
+        self.addCleanup(temporary.cleanup)
+        self.root = Path(temporary.name)
+        self.config = self.root / "launcher.toml"
+        self.config.write_text(
+            'image = "registry.example/image"\nhost_share = "missing-share"\n'
+            'kubeconfig = "missing-kubeconfig"\nproviders = ["forge"]\n'
+        )
+
+    def arguments(self, *extra: str) -> list[str]:
+        return ["--config", str(self.config), "--no-share", "--no-policy", *extra]
+
+    def test_each_agent_uses_disposable_workspace_and_preserves_launch_options(self) -> None:
+        for agent in launcher.AGENTS:
+            for keep in (False, True):
+                with self.subTest(agent=agent, keep=keep), \
+                     mock.patch.object(launcher, "git_identity", return_value=(None, None)) as identity, \
+                     mock.patch.object(launcher.subprocess, "run", return_value=mock.Mock(returncode=17)) as execute, \
+                     mock.patch.object(sys, "stderr", new_callable=io.StringIO) as stderr:
+                    flags = ["--agent", agent, "--no-kubeconfig", "-v"]
+                    if keep:
+                        flags.append("--keep")
+                    self.assertEqual(launcher.run(
+                        self.arguments(*flags, "--", "--model", "example-model"), cwd=self.root,
+                    ), 17)
+                    identity.assert_called_once_with(None)
+                    execute.assert_called_once()
+                    command = execute.call_args.args[0]
+                    driver = next(arg for arg in command if arg.startswith("--driver-config-json="))
+                    self.assertEqual(json.loads(driver.split("=", 1)[1]), {
+                        "podman": {"mounts": [{"type": "tmpfs", "target": "/tmp/gws", "mode": 0o777}]},
+                    })
+                    self.assertEqual(command[-6:], [
+                        "/usr/local/bin/exoshell-agent", "/workspace", "--", agent,
+                        "--model", "example-model",
+                    ])
+                    self.assertEqual("--no-keep" in command, not keep)
+                    self.assertIn("project=ephemeral", command)
+                    self.assertIn("forge", command)
+                    self.assertFalse(any(arg.startswith("KUBECONFIG=") for arg in command))
+                    self.assertFalse(any(arg.startswith("GIT_AUTHOR_") for arg in command))
+                    for key in ("host_share", "project", "kubeconfig"):
+                        self.assertIn(f"exoshell: {key} = null\n", stderr.getvalue())
+                    self.assertIn("exoshell: no_share = true\n", stderr.getvalue())
+
+    def test_conflicting_explicit_arguments_fail_before_subprocesses(self) -> None:
+        for extra in (("--host-share", "/missing"), ("--kubeconfig", "/missing"), ("/missing",)):
+            with self.subTest(extra=extra), mock.patch.object(launcher.subprocess, "run") as execute:
+                with self.assertRaisesRegex(launcher.LauncherError, "--no-share cannot be combined"):
+                    launcher.run(self.arguments(*extra), cwd=self.root)
+                execute.assert_not_called()
+
+    def test_policy_is_still_required_and_validated(self) -> None:
+        args = self.arguments()
+        args.remove("--no-policy")
+        for extra, message in (([], "no sandbox policy selected"), (["--policy", "/missing"], "policy file")):
+            with self.subTest(extra=extra), mock.patch.object(launcher.subprocess, "run") as execute:
+                with self.assertRaisesRegex(launcher.LauncherError, message):
+                    launcher.run([*args, *extra], cwd=self.root)
+                execute.assert_not_called()
+
+    def test_optional_global_identity(self) -> None:
+        missing = subprocess.CalledProcessError(1, ["git"])
+        for values, expected in (
+            (["Global User\n", "global@example.com\n"], ("Global User", "global@example.com")),
+            ([missing], (None, None)),
+            (["Global User\n", missing], (None, None)),
+            (["\n"], (None, None)),
+            (["Global User\n", "\n"], (None, None)),
+            ([FileNotFoundError()], (None, None)),
+        ):
+            results = [mock.Mock(stdout=value) if isinstance(value, str) else value for value in values]
+            with self.subTest(values=values), mock.patch.object(launcher.subprocess, "run", side_effect=results) as execute:
+                self.assertEqual(launcher.git_identity(None), expected)
+                for call, key in zip(execute.call_args_list, ("user.name", "user.email")):
+                    self.assertEqual(call.args[0], ["git", "config", "--global", "--get", key])
+        with mock.patch.object(launcher.subprocess, "run", side_effect=subprocess.CalledProcessError(128, ["git"])):
+            with self.assertRaisesRegex(launcher.LauncherError, "cannot read global Git"):
+                launcher.git_identity(None)
+
+    def test_forge_configuration_without_identity(self) -> None:
+        settings = {**launcher.DEFAULTS, "github_host": "github.example.com", "gitlab_host": "gitlab.example.com"}
+        environment = launcher.environment_args(settings, None, None)[1::2]
+        self.assertIn("GH_HOST=github.example.com", environment)
+        self.assertIn("GITLAB_HOST=gitlab.example.com", environment)
+        self.assertIn("GIT_CONFIG_COUNT=4", environment)
+        self.assertIn("GIT_CONFIG_KEY_0=credential.https://github.example.com.helper", environment)
+        self.assertIn("GIT_CONFIG_KEY_2=credential.https://gitlab.example.com.helper", environment)
+        self.assertFalse(any(arg.startswith(("GIT_AUTHOR_", "GIT_COMMITTER_")) for arg in environment))
+        self.assertFalse(any(arg.endswith(("=user.name", "=user.email")) for arg in environment))
+        self.assertIn("GIT_CONFIG_COUNT=0", launcher.environment_args(launcher.DEFAULTS, None, None))
 
 
 class OverlayBasePolicyTests(unittest.TestCase):
@@ -664,6 +760,42 @@ class LauncherIntegrationTests(unittest.TestCase):
             "HOME": str(root / "home"), "XDG_CONFIG_HOME": str(root / "xdg"),
         })
         return environment, capture, binaries
+
+    def test_no_share_wrapper_with_complete_missing_and_partial_global_identity(self) -> None:
+        for name, email in (("Global User", "global@example.com"), ("", ""), ("Global User", "")):
+            with self.subTest(name=name, email=email), tempfile.TemporaryDirectory() as temporary:
+                root = Path(temporary)
+                environment, capture, binaries = self.fake_environment(root)
+                environment.update(TEST_GIT_NAME=name, TEST_GIT_EMAIL=email)
+                self.executable(binaries / "git", (
+                    '[[ "$1 $2 $3" == "config --global --get" ]] || exit 128\n'
+                    'case "$4" in user.name) value="$TEST_GIT_NAME";; '
+                    'user.email) value="$TEST_GIT_EMAIL";; *) exit 128;; esac\n'
+                    '[[ -n "$value" ]] || exit 1\nprintf "%s\\n" "$value"\n'
+                ))
+                config = root / "launcher.toml"
+                config.write_text(
+                    'image = "localhost/test-image:latest"\nhost_share = "missing"\n'
+                    'kubeconfig = "missing"\ngitlab_host = "gitlab.example.com"\n'
+                )
+                result = subprocess.run(
+                    [str(ROOT / "run-exoshell-agent.sh"), "--config", str(config),
+                     "--no-share", "--no-policy"],
+                    cwd=root, env=environment, capture_output=True, text=True,
+                )
+                self.assertEqual(result.returncode, 0, result.stderr)
+                command = capture.read_text().splitlines()
+                self.assertIn("GITLAB_HOST=gitlab.example.com", command)
+                self.assertEqual(command[-4:], ["/usr/local/bin/exoshell-agent", "/workspace", "--", "codex"])
+                self.assertIn("project=ephemeral", command)
+                self.assertIn("--no-keep", command)
+                if name and email:
+                    self.assertIn(f"GIT_AUTHOR_NAME={name}", command)
+                    self.assertIn(f"GIT_COMMITTER_EMAIL={email}", command)
+                    self.assertIn("GIT_CONFIG_COUNT=4", command)
+                else:
+                    self.assertFalse(any(arg.startswith(("GIT_AUTHOR_", "GIT_COMMITTER_")) for arg in command))
+                    self.assertIn("GIT_CONFIG_COUNT=2", command)
 
     def test_verbose_wrapper_preserves_command_and_agent_argument_forwarding(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:

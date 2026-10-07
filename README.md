@@ -99,6 +99,27 @@ Example:
 
 ### Project paths and mounts
 
+For a disposable workspace with no launcher-supplied host bind mounts, pass
+`--no-share`. The agent starts in the image's writable `/workspace`, where it
+can clone a repository and work entirely inside the sandbox:
+
+```bash
+./run-exoshell-agent.sh --no-share --policy policies/policy.yaml \
+  -- "Clone https://git.example.com/example/project.git into /workspace/project and inspect it"
+```
+
+`--no-share` suppresses configured `host_share` and `kubeconfig` paths, even
+when they do not exist. It rejects an explicit `--host-share`, `--kubeconfig`,
+or positional project. Configuration discovery, providers, and policy selection
+still apply. Git identity comes only from global host configuration when both
+name and email are present; otherwise configure it inside the sandbox as needed.
+The `/tmp/gws` tmpfs remains available, and OpenShell manages its own internal
+storage. Cloned repositories and work are discarded when the sandbox is deleted;
+pass `--keep` to retain them. See
+[ADR-0037](adrs/adr0037-optional-host-sharing.md).
+
+For launches that share a host project, the following path rules apply.
+
 The project argument is a path on the host, not a path inside the sandbox. It
 must name an existing directory. Absolute paths, paths relative to the host
 shell's current directory, and the current directory itself are accepted:
@@ -219,7 +240,7 @@ OpenShell generates a unique sandbox name for each launcher invocation. Each
 sandbox has `managed-by=exoshell`, `project=<normalized project basename>`,
 and `agent=<selected agent>` labels. The runner passes `--no-keep`, so the
 sandbox is deleted when the agent exits. For debugging, pass `--keep` to retain
-the sandbox instead.
+the sandbox instead. With `--no-share`, the project label is `project=ephemeral`.
 
 Discover launcher-created sandboxes with labels:
 
