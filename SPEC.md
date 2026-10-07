@@ -77,6 +77,14 @@ that checkout; callers elsewhere must use `--config` or move it to the user
 directory. Overlay users must supply the correct `--base-file` explicitly;
 launcher discovery does not determine the helper's baseline. See ADR-0034.
 
+The CLI-only `-v` / `--verbose` flag reports the absolute selected configuration
+path before loading it, or identifies built-in defaults when no file is selected.
+After successful settings validation, it reports every effective launcher setting,
+including CLI overrides, composed providers, and resolved project and mount paths.
+Diagnostics use `exoshell: key = value` lines with JSON values on stderr and are
+flushed before image checks, Git identity lookup, and sandbox creation. File
+contents, environment variables, and forwarded agent arguments are not dumped.
+
 ## 4. Policies and providers
 
 `policies/policy.yaml` is the portable baseline. Select it with the launcher's

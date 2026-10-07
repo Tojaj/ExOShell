@@ -184,6 +184,20 @@ moving the file.
 Policy-overlay users must supply the correct `--base-file` explicitly;
 launcher discovery does not select the overlay helper's baseline.
 
+For configuration debugging, pass `-v` or `--verbose`:
+
+```bash
+./run-exoshell-agent.sh --verbose /path/to/project
+```
+
+The runner reports the absolute selected config path, or that built-in defaults
+are in use, followed by the effective launcher settings on stderr. These values
+include CLI overrides, the composed provider list, and resolved host and
+container paths. Unset values appear as `null`. The config path is reported
+before loading the file; effective settings appear after successful validation
+and before image checks and sandbox creation. Verbosity is a launcher option;
+flags after `--` are passed to the agent.
+
 Common providers compose with providers for the selected agent:
 
 ```toml

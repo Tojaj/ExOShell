@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import io
 import json
 import os
 from pathlib import Path
@@ -253,6 +254,107 @@ class DiscoveryTests(unittest.TestCase):
         os.environ["XDG_CONFIG_DIRS"] = str(extra.parents[1])
         self.assertIsNone(launcher.discover_config(None, cwd=self.cwd))
 
+    def verbose_values(self, *arguments: str) -> dict[str, object]:
+        with mock.patch.object(sys, "stderr", new_callable=io.StringIO) as stderr, \
+             mock.patch.object(sys, "stdout", new_callable=io.StringIO) as stdout:
+            self.command(*arguments)
+            self.assertEqual(stdout.getvalue(), "")
+        return {
+            key: json.loads(value)
+            for key, value in (
+                line.removeprefix("exoshell: ").split(" = ", 1)
+                for line in stderr.getvalue().splitlines()
+            )
+        }
+
+    def test_verbose_aliases_defaults_and_silent_normal_launch(self) -> None:
+        self.assertEqual(self.verbose_values(), {})
+        expected = {
+            "config": "built-in defaults", "agent": "codex",
+            "image": launcher.DEFAULTS["image"], "providers": ["exoshell-codex"],
+            "policy": None, "kubeconfig": None, "github_host": None,
+            "gitlab_host": None, "keep": False, "host_share": str(self.cwd),
+            "project": str(self.cwd), "container_project": "/workspace",
+        }
+        for arguments in (("-v",), ("--verbose",), ("-v", "--verbose")):
+            with self.subTest(arguments=arguments):
+                values = self.verbose_values(*arguments)
+                self.assertEqual(values, expected)
+                self.assertEqual(list(values), list(expected))
+
+    def test_verbose_selected_discovered_and_explicit_config_paths(self) -> None:
+        for path in (self.local, self.user, self.system):
+            path.write_text('image = "registry.example/test"\n')
+        for path in (self.local, self.user, self.system):
+            with self.subTest(path=path):
+                self.assertEqual(self.verbose_values("-v")["config"], str(path))
+                path.unlink()
+        explicit = self.cwd / "custom config.toml"
+        explicit.write_text('image = "registry.example/explicit"\n')
+        link = self.cwd / "linked.toml"
+        link.symlink_to(explicit)
+        values = self.verbose_values("--verbose", "--config", link.name)
+        self.assertEqual(values["config"], str(explicit))
+        self.assertEqual(values["image"], "registry.example/explicit")
+
+    def test_verbose_effective_paths_providers_overrides_and_clearing(self) -> None:
+        project = self.cwd / 'share with spaces' / 'project "quoted"'
+        project.mkdir(parents=True)
+        policy = self.user.parent / "policy.yaml"
+        policy.write_text("")
+        kubeconfig = self.user.parent / "kubeconfig"
+        kubeconfig.write_text("private contents")
+        self.user.write_text(
+            f'host_share = "{project.parent}"\n'
+            'policy = "policy.yaml"\nkubeconfig = "kubeconfig"\n'
+            'github_host = "github.example.com"\ngitlab_host = "gitlab.example.com"\n'
+            'providers = ["common"]\n[agents.claude]\nproviders = ["claude-api"]\n'
+        )
+        values = self.verbose_values("-v", "--agent", "claude", str(project))
+        self.assertEqual(values["agent"], "claude")
+        self.assertEqual(values["providers"], ["common", "claude-api"])
+        self.assertEqual(values["policy"], str(policy))
+        self.assertEqual(values["kubeconfig"], str(kubeconfig))
+        self.assertEqual(values["project"], str(project))
+        self.assertEqual(values["host_share"], str(project.parent))
+        self.assertEqual(values["container_project"], '/workspace/project "quoted"')
+        values = self.verbose_values(
+            "-v", "--image", "registry.example/cli", "--provider", "replacement",
+            "--keep", "--no-policy", "--no-kubeconfig", "--no-github-host",
+            "--gitlab-host", "cli.example.com", "--host-share", ".", str(project),
+        )
+        self.assertEqual(values["image"], "registry.example/cli")
+        self.assertEqual(values["providers"], ["replacement"])
+        self.assertTrue(values["keep"])
+        for key in ("policy", "kubeconfig", "github_host"):
+            self.assertIsNone(values[key])
+        self.assertEqual(values["gitlab_host"], "cli.example.com")
+        self.assertEqual(values["host_share"], str(self.cwd))
+        self.assertEqual(self.verbose_values("-v", "--no-providers", str(project))["providers"], [])
+
+    def test_verbose_reports_selected_config_before_loading_failure(self) -> None:
+        self.local.write_text("not valid TOML")
+        with mock.patch.object(sys, "stderr", new_callable=io.StringIO) as stderr:
+            with self.assertRaises(launcher.LauncherError):
+                launcher.run(["-v"], cwd=self.cwd)
+        self.assertEqual(stderr.getvalue(), f'exoshell: config = {json.dumps(str(self.local))}\n')
+
+    def test_verbose_settings_are_flushed_before_image_and_git_checks(self) -> None:
+        with mock.patch.object(sys, "stderr", new_callable=io.StringIO) as stderr:
+            def check_output(*args: object) -> mock.Mock:
+                self.assertIn('exoshell: container_project = "/workspace"\n', stderr.getvalue())
+                return mock.Mock(returncode=0)
+
+            def check_identity(project: Path) -> tuple[str, str]:
+                check_output()
+                return "Test", "test@example.com"
+
+            with mock.patch.object(launcher.subprocess, "run", side_effect=check_output), \
+                 mock.patch.object(launcher, "git_identity", side_effect=check_identity), \
+                 mock.patch.object(stderr, "flush", wraps=stderr.flush) as flush:
+                self.assertEqual(launcher.run(["-v"], cwd=self.cwd), 0)
+                self.assertEqual(flush.call_count, 12)
+
 
 class ResolutionTests(unittest.TestCase):
     def parse(self, *arguments: str) -> argparse.Namespace:
@@ -491,6 +593,34 @@ class LauncherIntegrationTests(unittest.TestCase):
             "HOME": str(root / "home"), "XDG_CONFIG_HOME": str(root / "xdg"),
         })
         return environment, capture, binaries
+
+    def test_verbose_wrapper_preserves_command_and_agent_argument_forwarding(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            environment, capture, _ = self.fake_environment(root)
+            environment["EXOSHELL_TEST_SECRET"] = "secret must not be dumped"
+            config = root / "launcher.toml"
+            config.write_text('image = "localhost/test-image:latest"\n')
+            commands = []
+            for flags in ([], ["-v"], ["--verbose"]):
+                result = subprocess.run(
+                    [str(ROOT / "run-exoshell-agent.sh"), "--config", str(config),
+                     *flags, "--", "-v", "--verbose", "private agent argument"],
+                    cwd=root, env=environment, capture_output=True, text=True,
+                )
+                self.assertEqual(result.returncode, 0, result.stderr)
+                self.assertEqual(result.stdout, "")
+                commands.append(capture.read_text().splitlines())
+                self.assertEqual(commands[-1][-3:], ["-v", "--verbose", "private agent argument"])
+                if flags:
+                    self.assertIn(f'exoshell: config = {json.dumps(str(config))}\n', result.stderr)
+                    self.assertIn('exoshell: image = "localhost/test-image:latest"\n', result.stderr)
+                    self.assertNotIn("private agent argument", result.stderr)
+                    self.assertNotIn(environment["EXOSHELL_TEST_SECRET"], result.stderr)
+                else:
+                    self.assertEqual(result.stderr, "")
+            self.assertEqual(commands[0], commands[1])
+            self.assertEqual(commands[0], commands[2])
 
     def test_wrapper_discovery_uses_caller_not_project_or_launcher(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:

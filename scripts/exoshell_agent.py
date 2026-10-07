@@ -74,6 +74,10 @@ def parser(*, prog: str = "run-exoshell-agent.sh") -> argparse.ArgumentParser:
         "--config", type=Path,
         help="TOML file (any filename; relative to caller's directory; bypasses discovery)",
     )
+    result.add_argument(
+        "-v", "--verbose", action="store_true",
+        help="report the selected configuration file and effective settings on stderr",
+    )
     result.add_argument("--image", help="sandbox OCI image")
     result.add_argument(
         "--keep",
@@ -414,6 +418,12 @@ def is_local_image(image: str) -> bool:
     return image.startswith("localhost/")
 
 
+def _verbose_value(key: str, value: Any) -> None:
+    if isinstance(value, Path):
+        value = str(value)
+    print(f"exoshell: {key} = {json.dumps(value)}", file=sys.stderr, flush=True)
+
+
 def run(argv: Sequence[str], *, cwd: Path) -> int:
     launcher_args, agent_args = split_agent_args(argv)
     args = parser().parse_args(launcher_args)
@@ -424,8 +434,18 @@ def run(argv: Sequence[str], *, cwd: Path) -> int:
             config_path = config_path.resolve(strict=False)
         except (OSError, RuntimeError) as error:
             raise LauncherError(f"cannot resolve configuration {config_path}: {error}") from error
+        if args.verbose:
+            _verbose_value("config", config_path)
         config = load_config(config_path, required=True)
+    elif args.verbose:
+        _verbose_value("config", "built-in defaults")
     settings = resolve_settings(args, config, cwd=cwd)
+    if args.verbose:
+        for key in (
+            "agent", "image", "providers", "policy", "kubeconfig", "github_host",
+            "gitlab_host", "keep", "host_share", "project", "container_project",
+        ):
+            _verbose_value(key, settings[key])
     if is_local_image(settings["image"]):
         try:
             image_result = subprocess.run(["podman", "image", "exists", settings["image"]])
