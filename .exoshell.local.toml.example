@@ -30,18 +30,15 @@ providers = ["exoshell-github", "exoshell-gws"]
 
 [agents.codex]
 providers = ["exoshell-codex"]
-# model = "example-model"
-# effort = "high" # Codex: model_reasoning_effort
-# Add "exoshell-atlassian-mcp" after configuring the optional Atlassian integration.
+# model = "gpt-6-sol"
+# effort = "medium" # Codex: model_reasoning_effort
 
 [agents.claude]
 providers = ["exoshell-claude-code"]
 # model = "sonnet"
 # effort = "high" # Claude Code: --effort
-# Add "exoshell-atlassian-mcp" after configuring the optional Atlassian integration.
 
 [agents.opencode]
 providers = ["exoshell-opencode-openrouter"]
 # model = "openrouter/example-model"
 # effort = "high" # OpenCode: variant; requires model
-# Add "exoshell-atlassian-mcp" after configuring the optional Atlassian integration.
