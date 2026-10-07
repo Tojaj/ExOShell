@@ -1,4 +1,17 @@
-# Copy to .exoshell.local.toml and adjust paths for this machine.
+# Copy to .exoshell.local.toml in the caller's directory, or to
+# $XDG_CONFIG_HOME/exoshell/exoshell.local.toml (default: ~/.config/exoshell/).
+# Search order: --config PATH, caller's .exoshell.local.toml, user config above,
+# then /etc/exoshell/exoshell.local.toml. --config accepts any filename and
+# bypasses discovery; relative CLI paths use the caller's directory.
+# Unset, empty, or relative XDG_CONFIG_HOME uses ~/.config. Absent candidates
+# are skipped; invalid, unreadable, or non-file candidates are errors.
+# Only one file is loaded; missing keys use built-in defaults, not other files.
+# CLI options override settings. TOML paths are relative to this file.
+# No launcher/project/parent lookup, uppercase aliases, or XDG_CONFIG_DIRS.
+# A checkout config is discovered only when called from that checkout;
+# callers elsewhere must pass --config or move it to the user config path.
+# Adjust paths for this machine, especially if moving this file.
+# Overlay users must supply --base-file explicitly; discovery does not set it.
 image = "localhost/exoshell-local:latest"
 host_share = "/home/you/src"
 agent = "codex"

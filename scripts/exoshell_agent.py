@@ -5,8 +5,10 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 from pathlib import Path
 import re
+import stat
 import subprocess
 import sys
 import tomllib
@@ -15,6 +17,7 @@ from typing import Any, Sequence
 
 CONTAINER_WORKSPACE = "/workspace"
 CONTAINER_HOME = "/sandbox"
+SYSTEM_CONFIG_FILE = Path("/etc/exoshell/exoshell.local.toml")
 AGENTS: dict[str, dict[str, Any]] = {
     "codex": {
         "executable": "codex",
@@ -56,10 +59,21 @@ def parser(*, prog: str = "run-exoshell-agent.sh") -> argparse.ArgumentParser:
     result = argparse.ArgumentParser(
         prog=prog,
         description="Create an OpenShell sandbox and start a coding agent in PROJECT.",
-        epilog="Arguments after -- are passed unchanged to the selected agent.",
+        epilog=(
+            "Load only the first configuration file: --config PATH, "
+            ".exoshell.local.toml in the caller's current directory, "
+            "$XDG_CONFIG_HOME/exoshell/exoshell.local.toml (default: "
+            "~/.config/exoshell/exoshell.local.toml), then "
+            "/etc/exoshell/exoshell.local.toml. Unset, empty, or relative "
+            "XDG_CONFIG_HOME uses ~/.config. Missing keys use built-in defaults. "
+            "Arguments after -- are passed unchanged to the selected agent."
+        ),
     )
     result.add_argument("--agent", choices=AGENTS, help="coding agent (default: codex)")
-    result.add_argument("--config", type=Path, help="TOML configuration file")
+    result.add_argument(
+        "--config", type=Path,
+        help="TOML file (any filename; relative to caller's directory; bypasses discovery)",
+    )
     result.add_argument("--image", help="sandbox OCI image")
     result.add_argument(
         "--keep",
@@ -111,18 +125,46 @@ def _provider_list(value: Any, key: str) -> list[str]:
     return value
 
 
+def discover_config(explicit: Path | None, *, cwd: Path) -> Path | None:
+    """Select one config, without inheriting settings from later candidates."""
+    if explicit is not None:
+        return _resolve_path(explicit, cwd)
+
+    xdg_home = os.environ.get("XDG_CONFIG_HOME", "")
+    user_directory = Path(xdg_home) if Path(xdg_home).is_absolute() else Path.home() / ".config"
+    candidates = (
+        cwd / ".exoshell.local.toml",
+        user_directory / "exoshell" / "exoshell.local.toml",
+        SYSTEM_CONFIG_FILE,
+    )
+    for candidate in candidates:
+        try:
+            # lstat also selects dangling symlinks so loading reports an error.
+            candidate.lstat()
+        except FileNotFoundError:
+            continue
+        except OSError as error:
+            raise LauncherError(f"cannot inspect configuration {candidate}: {error}") from error
+        return candidate
+    return None
+
+
 def load_config(path: Path, *, required: bool) -> dict[str, Any]:
     """Load and validate launcher settings from a TOML file."""
-    if not path.exists():
+    try:
+        mode = path.stat().st_mode
+    except FileNotFoundError as error:
         if required:
-            raise LauncherError(f"configuration file does not exist: {path}")
+            raise LauncherError(f"configuration file does not exist: {path}") from error
         return {}
-    if not path.is_file():
+    except OSError as error:
+        raise LauncherError(f"cannot inspect configuration {path}: {error}") from error
+    if not stat.S_ISREG(mode):
         raise LauncherError(f"configuration path is not a file: {path}")
     try:
         with path.open("rb") as stream:
             data = tomllib.load(stream)
-    except (OSError, tomllib.TOMLDecodeError) as error:
+    except (OSError, UnicodeDecodeError, tomllib.TOMLDecodeError) as error:
         raise LauncherError(f"cannot load configuration {path}: {error}") from error
     unknown = sorted(set(data) - CONFIG_KEYS)
     if unknown:
@@ -372,11 +414,17 @@ def is_local_image(image: str) -> bool:
     return image.startswith("localhost/")
 
 
-def run(argv: Sequence[str], *, root: Path, cwd: Path) -> int:
+def run(argv: Sequence[str], *, cwd: Path) -> int:
     launcher_args, agent_args = split_agent_args(argv)
     args = parser().parse_args(launcher_args)
-    config_path = _resolve_path(args.config, cwd) if args.config is not None else root / ".exoshell.local.toml"
-    config = load_config(config_path.resolve(strict=False), required=args.config is not None)
+    config_path = discover_config(args.config, cwd=cwd)
+    config = {}
+    if config_path is not None:
+        try:
+            config_path = config_path.resolve(strict=False)
+        except (OSError, RuntimeError) as error:
+            raise LauncherError(f"cannot resolve configuration {config_path}: {error}") from error
+        config = load_config(config_path, required=True)
     settings = resolve_settings(args, config, cwd=cwd)
     if is_local_image(settings["image"]):
         try:
@@ -396,9 +444,7 @@ def run(argv: Sequence[str], *, root: Path, cwd: Path) -> int:
 
 def main() -> int:
     try:
-        return run(
-            sys.argv[1:], root=Path(__file__).resolve().parents[1], cwd=Path.cwd()
-        )
+        return run(sys.argv[1:], cwd=Path.cwd())
     except LauncherError as error:
         print(f"error: {error}", file=sys.stderr)
         return 2

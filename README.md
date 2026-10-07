@@ -152,13 +152,39 @@ as the reference:
 chcon --reference=. path/to/file
 ```
 
-Arguments after `--` are passed unchanged to the selected executable. Without
-`.exoshell.local.toml`, defaults are the local image, Codex, provider `exoshell-codex`,
-and no optional integrations.
+Arguments after `--` are passed unchanged to the selected executable. The
+launcher loads one configuration file in this priority order:
 
-Copy `.exoshell.local.toml.example` to the ignored `.exoshell.local.toml` for
-machine defaults. Common providers compose with providers for the selected
-agent:
+1. Explicit `--config PATH` (any filename; relative paths use the caller's
+   current directory and bypass discovery).
+2. `.exoshell.local.toml` in the caller's current working directory.
+3. `$XDG_CONFIG_HOME/exoshell/exoshell.local.toml`, defaulting to
+   `~/.config/exoshell/exoshell.local.toml` when `XDG_CONFIG_HOME` is unset,
+   empty, or relative.
+4. `/etc/exoshell/exoshell.local.toml`.
+5. Built-in defaults: the local image, Codex, provider `exoshell-codex`, and
+   no optional integrations.
+
+Absent discovery candidates are skipped. Invalid, unreadable, or non-file
+candidates stop the launch; a missing explicit file is also an error. Only
+the selected file is loaded: missing keys use built-in defaults, even if a
+lower-priority file supplies them. CLI options override the selected file.
+TOML paths resolve relative to that file; CLI paths use the caller's directory.
+Discovery does not search the positional project, parent directories, or
+the launcher's directory, and does not use uppercase aliases or `XDG_CONFIG_DIRS`.
+
+Copy `.exoshell.local.toml.example` to `.exoshell.local.toml` in a working
+directory for local defaults, or to the user configuration path for defaults
+across projects. A checkout config remains discoverable when running from
+that checkout. If you previously relied on lookup beside the launcher while
+calling it elsewhere, pass `--config /path/to/checkout/.exoshell.local.toml`
+or move the config to the user directory. Adjust relative TOML paths when
+moving the file.
+
+Policy-overlay users must supply the correct `--base-file` explicitly;
+launcher discovery does not select the overlay helper's baseline.
+
+Common providers compose with providers for the selected agent:
 
 ```toml
 agent = "codex"

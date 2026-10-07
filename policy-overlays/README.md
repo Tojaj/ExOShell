@@ -56,10 +56,12 @@ Bare names are looked up in `policy-overlays/`; the `.yaml` suffix is optional.
 A path containing `/` or beginning with `.` is used as-is. Applying the same
 overlay again is idempotent because it replaces the same entry.
 
-`--revert` reads `network_policies` from the policy selected in
-`.exoshell.local.toml`, or `policies/policy.yaml` when no local policy is
-configured. Its diff always compares the original live state with the final
-composed state.
+`--revert` reads `network_policies` from `--base-file`. Without that option,
+the helper still uses the policy in its checkout's `.exoshell.local.toml`,
+or `policies/policy.yaml` when no local policy is configured. Launcher config
+discovery does not determine this baseline: supply the correct `--base-file`
+explicitly, especially when using a caller-directory or user config. Its diff
+always compares the original live state with the final composed state.
 
 ## GitHub overlays
 

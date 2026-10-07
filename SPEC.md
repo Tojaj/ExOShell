@@ -56,11 +56,26 @@ The launcher injects the selected project's effective Git name and email.
 Configured forge hosts select the CLI host, HTTPS URL rewriting, and transient
 Git credential helpers. They do not grant network access or create providers.
 
-Configuration defaults come from the ignored `.exoshell.local.toml` beside the
-launcher or an explicit `--config` file. File paths in TOML resolve relative
-to that configuration file. CLI paths resolve relative to the caller's working
-directory. CLI settings override configuration. Common and selected-agent
-providers compose; explicit CLI provider options replace the combined list.
+Configuration loads exactly one file, in priority order: explicit `--config
+PATH`, `.exoshell.local.toml` in the caller's current directory,
+`$XDG_CONFIG_HOME/exoshell/exoshell.local.toml`, then
+`/etc/exoshell/exoshell.local.toml`. An unset, empty, or relative
+`XDG_CONFIG_HOME` uses `~/.config`. Explicit config accepts any filename,
+resolves relative to the caller's directory, and bypasses discovery.
+Absent candidates are skipped; invalid, unreadable, or non-file candidates
+and missing explicit files are errors. With no file, built-in defaults apply.
+Missing keys in a selected file also use built-in defaults, without inheriting
+from lower-priority files.
+
+File paths in TOML resolve relative to the selected configuration file. CLI
+paths resolve relative to the caller's working directory. CLI settings
+override configuration. Common and selected-agent providers compose; explicit
+CLI provider options replace the combined list. Discovery does not search the
+launcher directory, positional project, parents, uppercase aliases, or
+`XDG_CONFIG_DIRS`. A checkout config is still discovered when called from
+that checkout; callers elsewhere must use `--config` or move it to the user
+directory. Overlay users must supply the correct `--base-file` explicitly;
+launcher discovery does not determine the helper's baseline. See ADR-0034.
 
 ## 4. Policies and providers
 

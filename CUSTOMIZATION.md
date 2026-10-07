@@ -5,6 +5,26 @@ control services. Keep machine-specific values in `.exoshell.local.toml`, keep
 credentials in OpenShell providers, and put only non-secret configuration in
 images and committed YAML files.
 
+The launcher loads one configuration file: explicit `--config PATH`, then
+`.exoshell.local.toml` in the caller's current directory, then
+`$XDG_CONFIG_HOME/exoshell/exoshell.local.toml`, then
+`/etc/exoshell/exoshell.local.toml`. The user directory defaults to
+`~/.config` when `XDG_CONFIG_HOME` is unset, empty, or relative. Explicit
+config accepts any filename, resolves relative to the caller's directory,
+and bypasses discovery. Absent discovery candidates are skipped; invalid,
+unreadable, or non-file candidates and missing explicit files are errors.
+Only the selected file is loaded. Missing keys use built-in defaults without
+inheriting lower-priority settings, and CLI options override file settings.
+TOML paths resolve relative to the selected file; CLI paths use the caller's
+directory.
+
+Discovery uses the caller's directory, independently of the positional
+project and launcher locations. It does not search parents, uppercase aliases,
+or `XDG_CONFIG_DIRS`. Existing checkout configs remain discoverable when
+running from that checkout. When calling the launcher elsewhere, supply
+`--config` or move the config into the user directory, adjusting relative
+paths as needed. See [ADR-0034](adrs/adr0034-launcher-config-discovery.md).
+
 The main extension points are:
 
 | Need | Extension point |
@@ -39,8 +59,9 @@ current customization repository:
 
 TOML file paths resolve relative to that file, so `policy =
 "policies/policy-local.yaml"` can stay within the customization repository.
-The overlay helper's automatic baseline lookup uses its own checkout's local
-configuration, so supply `--base-file` explicitly for a downstream baseline.
+The overlay helper's automatic baseline lookup still uses its own checkout's
+local configuration. Overlay users must supply the correct `--base-file`
+explicitly; launcher discovery does not determine the helper's baseline.
 Build the generic image from the selected checkout, then the custom workload
 and optional supervisor, and finally use the upstream local-user build script
 with `--base-image` and `--tag` to select the custom ownership layer.

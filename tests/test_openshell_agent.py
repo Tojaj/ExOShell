@@ -5,6 +5,7 @@ import json
 import os
 from pathlib import Path
 import runpy
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -71,6 +72,186 @@ class ConfigTests(unittest.TestCase):
             config = launcher.load_config(path, required=True)
             self.assertEqual(config["host_share"], root / "source")
             self.assertEqual(config["policy"], root / "policy.yaml")
+
+
+class DiscoveryTests(unittest.TestCase):
+    def setUp(self) -> None:
+        temporary = tempfile.TemporaryDirectory()
+        self.addCleanup(temporary.cleanup)
+        self.root = Path(temporary.name)
+        self.cwd = self.root / "caller"
+        self.home = self.root / "home"
+        self.cwd.mkdir()
+        self.home.mkdir()
+        self.local = self.cwd / ".exoshell.local.toml"
+        self.user = self.home / ".config/exoshell/exoshell.local.toml"
+        self.system = self.root / "etc/exoshell/exoshell.local.toml"
+        self.user.parent.mkdir(parents=True)
+        self.system.parent.mkdir(parents=True)
+        environment = mock.patch.dict(os.environ, {"HOME": str(self.home)})
+        environment.start()
+        self.addCleanup(environment.stop)
+        os.environ.pop("XDG_CONFIG_HOME", None)
+        system = mock.patch.object(launcher, "SYSTEM_CONFIG_FILE", self.system)
+        system.start()
+        self.addCleanup(system.stop)
+
+    def command(self, *arguments: str) -> list[str]:
+        with mock.patch.object(launcher, "git_identity", return_value=("Test", "test@example.com")), \
+             mock.patch.object(launcher.subprocess, "run", return_value=mock.Mock(returncode=0)) as execute:
+            self.assertEqual(launcher.run(arguments, cwd=self.cwd), 0)
+        return execute.call_args.args[0]
+
+    def test_each_location_and_precedence_then_defaults(self) -> None:
+        for name, path in (("caller", self.local), ("user", self.user), ("system", self.system)):
+            path.write_text(f'image = "registry.example/{name}"\n')
+        for name, path in (("caller", self.local), ("user", self.user), ("system", self.system)):
+            with self.subTest(location=name):
+                self.assertEqual(launcher.discover_config(None, cwd=self.cwd), path)
+                self.assertIn(f"registry.example/{name}", self.command())
+                path.unlink()
+        self.assertIsNone(launcher.discover_config(None, cwd=self.cwd))
+        command = self.command()
+        self.assertIn(launcher.DEFAULTS["image"], command)
+        self.assertIn("exoshell-codex", command)
+
+    def test_explicit_arbitrary_filename_relative_absolute_and_missing(self) -> None:
+        # Even an invalid discovery candidate must not affect explicit selection.
+        self.local.mkdir()
+        explicit = self.cwd / "settings.data"
+        explicit.write_text('image = "registry.example/explicit"\n')
+        for argument in (explicit.name, str(explicit)):
+            with self.subTest(argument=argument):
+                self.assertEqual(launcher.discover_config(Path(argument), cwd=self.cwd), explicit)
+                self.assertIn("registry.example/explicit", self.command("--config", argument))
+        self.user.write_text('image = "registry.example/user"\n')
+        with self.assertRaisesRegex(launcher.LauncherError, "does not exist"):
+            self.command("--config", "missing.toml")
+
+    def test_xdg_absolute_override_and_unset_empty_relative_fallbacks(self) -> None:
+        self.user.write_text("")
+        override = self.root / "xdg/exoshell/exoshell.local.toml"
+        override.parent.mkdir(parents=True)
+        override.write_text("")
+        for value in (None, "", "relative", "~/config", str(override.parents[1])):
+            with self.subTest(value=value):
+                if value is None:
+                    os.environ.pop("XDG_CONFIG_HOME", None)
+                else:
+                    os.environ["XDG_CONFIG_HOME"] = value
+                expected = override if value == str(override.parents[1]) else self.user
+                self.assertEqual(launcher.discover_config(None, cwd=self.cwd), expected)
+
+    def test_empty_and_partial_configs_do_not_inherit(self) -> None:
+        self.user.write_text('agent = "claude"\nimage = "registry.example/user"\nproviders = ["user"]\n')
+        self.system.write_text('github_host = "system.example.com"\n')
+        for content, image in (("", launcher.DEFAULTS["image"]),
+                               ('image = "registry.example/local"\n', "registry.example/local")):
+            with self.subTest(content=content):
+                self.local.write_text(content)
+                command = self.command()
+                self.assertIn(image, command)
+                self.assertIn("codex", command)
+                self.assertIn("exoshell-codex", command)
+                self.assertNotIn("user", command)
+                self.assertFalse(any(value.startswith("GH_HOST=") for value in command))
+
+    def test_invalid_configs_at_each_location_stop_launch(self) -> None:
+        for path in (self.local, self.user, self.system):
+            for content in ('image = [', 'unknown = "value"\n'):
+                with self.subTest(path=path, content=content):
+                    path.write_text(content)
+                    with self.assertRaises(launcher.LauncherError):
+                        self.command()
+                    path.unlink()
+
+    def test_directory_fifo_and_dangling_symlink_stop_launch(self) -> None:
+        self.user.write_text("")
+        self.local.mkdir()
+        with self.assertRaisesRegex(launcher.LauncherError, "not a file"):
+            self.command()
+        self.local.rmdir()
+        os.mkfifo(self.local)
+        with self.assertRaisesRegex(launcher.LauncherError, "not a file"):
+            self.command()
+        self.local.unlink()
+        self.local.symlink_to(self.cwd / "missing.toml")
+        with self.assertRaisesRegex(launcher.LauncherError, "does not exist"):
+            self.command()
+
+    def test_invalid_utf8_and_symlink_loop_are_actionable(self) -> None:
+        self.user.write_text("")
+        self.local.write_bytes(b'\xff')
+        with self.assertRaisesRegex(launcher.LauncherError, "cannot load configuration"):
+            self.command()
+        self.local.unlink()
+        self.local.symlink_to(self.local)
+        with self.assertRaisesRegex(launcher.LauncherError, "cannot (resolve|inspect) configuration"):
+            self.command()
+
+    def test_inspection_and_read_permission_errors_are_actionable(self) -> None:
+        self.local.write_text("")
+        self.user.write_text("")
+        with mock.patch.object(Path, "lstat", side_effect=PermissionError("denied")):
+            with self.assertRaisesRegex(launcher.LauncherError, "cannot inspect configuration"):
+                self.command()
+        with mock.patch.object(Path, "stat", side_effect=PermissionError("denied")):
+            with self.assertRaisesRegex(launcher.LauncherError, "cannot inspect configuration"):
+                self.command()
+        with mock.patch.object(Path, "open", side_effect=PermissionError("denied")):
+            with self.assertRaisesRegex(launcher.LauncherError, "cannot load configuration"):
+                self.command()
+
+    def test_non_directory_ancestor_is_an_error(self) -> None:
+        blocked = self.root / "blocked"
+        blocked.write_text("")
+        os.environ["XDG_CONFIG_HOME"] = str(blocked)
+        with self.assertRaisesRegex(launcher.LauncherError, "cannot inspect configuration"):
+            self.command()
+
+    def test_selected_config_paths_provider_composition_and_cli_overrides(self) -> None:
+        policy = self.user.parent / "policy.yaml"
+        policy.write_text("network_policies: {}\n")
+        kubeconfig = self.user.parent / "kubeconfig"
+        kubeconfig.write_text("")
+        project = self.user.parent / "source/project"
+        project.mkdir(parents=True)
+        self.user.write_text(
+            'image = "registry.example/user"\npolicy = "policy.yaml"\n'
+            'host_share = "source"\nkubeconfig = "kubeconfig"\nproviders = ["common"]\n'
+            '[agents.claude]\nproviders = ["claude-api"]\n'
+        )
+        command = self.command("--agent", "claude", str(project))
+        self.assertIn(str(policy), command)
+        self.assertIn("common", command)
+        self.assertIn("claude-api", command)
+        driver = next(value for value in command if value.startswith("--driver-config-json="))
+        mounts = json.loads(driver.split("=", 1)[1])["podman"]["mounts"]
+        self.assertEqual(mounts[0]["source"], str(project.parent))
+        self.assertEqual(mounts[1]["source"], str(kubeconfig))
+        self.assertIn("/workspace/project", command)
+        cli_policy = self.cwd / "cli.yaml"
+        cli_policy.write_text("")
+        command = self.command(
+            "--image", "registry.example/cli", "--policy", "cli.yaml", "--no-kubeconfig",
+            "--provider", "replacement", str(project),
+        )
+        self.assertIn("registry.example/cli", command)
+        self.assertIn(str(cli_policy), command)
+        self.assertIn("replacement", command)
+        self.assertNotIn("common", command)
+        self.assertNotIn("exoshell-codex", command)
+
+    def test_no_parent_uppercase_or_xdg_config_dirs_search(self) -> None:
+        (self.cwd.parent / ".exoshell.local.toml").write_text("")
+        uppercase = self.home / ".config/ExOShell/exoshell.local.toml"
+        uppercase.parent.mkdir()
+        uppercase.write_text("")
+        extra = self.root / "extra/exoshell/exoshell.local.toml"
+        extra.parent.mkdir(parents=True)
+        extra.write_text("")
+        os.environ["XDG_CONFIG_DIRS"] = str(extra.parents[1])
+        self.assertIsNone(launcher.discover_config(None, cwd=self.cwd))
 
 
 class ResolutionTests(unittest.TestCase):
@@ -305,8 +486,43 @@ class LauncherIntegrationTests(unittest.TestCase):
         )
         self.executable(binaries / "openshell", 'printf "%s\\n" "$@" > "$CAPTURE"\n')
         environment = os.environ.copy()
-        environment.update({"PATH": f"{binaries}:{environment['PATH']}", "CAPTURE": str(capture)})
+        environment.update({
+            "PATH": f"{binaries}:{environment['PATH']}", "CAPTURE": str(capture),
+            "HOME": str(root / "home"), "XDG_CONFIG_HOME": str(root / "xdg"),
+        })
         return environment, capture, binaries
+
+    def test_wrapper_discovery_uses_caller_not_project_or_launcher(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            checkout = root / "checkout"
+            checkout.joinpath("scripts").mkdir(parents=True)
+            shutil.copy2(ROOT / "run-exoshell-agent.sh", checkout)
+            shutil.copy2(ROOT / "scripts/exoshell_agent.py", checkout / "scripts")
+            # These must be ignored even though both locations contain configs.
+            checkout.joinpath(".exoshell.local.toml").write_text('unknown = true\n')
+            project = root / "project"
+            project.mkdir()
+            project.joinpath(".exoshell.local.toml").write_text('unknown = true\n')
+            caller = root / "caller"
+            caller.mkdir()
+            environment, capture, _ = self.fake_environment(root)
+            user_config = Path(environment["XDG_CONFIG_HOME"]) / "exoshell/exoshell.local.toml"
+            user_config.parent.mkdir(parents=True)
+            user_config.write_text('image = "registry.example/user"\n')
+            local_config = caller / ".exoshell.local.toml"
+            local_config.write_text('image = "localhost/test-image:latest"\n')
+            for expected in ("localhost/test-image:latest", "registry.example/user"):
+                with self.subTest(expected=expected):
+                    result = subprocess.run(
+                        [str(checkout / "run-exoshell-agent.sh"), str(project)],
+                        cwd=caller, env=environment, capture_output=True, text=True,
+                    )
+                    self.assertEqual(result.returncode, 0, result.stderr)
+                    arguments = capture.read_text().splitlines()
+                    self.assertEqual(arguments[arguments.index("--from") + 1], expected)
+                    if local_config.exists():
+                        local_config.unlink()
 
     def test_generic_wrapper_with_fake_commands(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
