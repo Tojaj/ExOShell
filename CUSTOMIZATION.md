@@ -18,6 +18,13 @@ inheriting lower-priority settings, and CLI options override file settings.
 TOML paths resolve relative to the selected file; CLI paths use the caller's
 directory.
 
+Select a policy with the TOML `policy` setting or `--policy PATH`. The launcher
+rejects an omitted policy, missing file, or non-file path before provisioning.
+Explicit `--no-policy` clears the configured path and delegates policy selection
+to OpenShell, which may use an environment or inherited image policy rather
+than its restrictive default. See
+[ADR-0035](adrs/adr0035-explicit-launcher-policy-selection.md).
+
 Discovery uses the caller's directory, independently of the positional
 project and launcher locations. It does not search parents, uppercase aliases,
 or `XDG_CONFIG_DIRS`. Existing checkout configs remain discoverable when

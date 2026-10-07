@@ -89,7 +89,13 @@ contents, environment variables, and forwarded agent arguments are not dumped.
 
 `policies/policy.yaml` is the portable baseline. Select it with the launcher's
 `--policy` option or the configuration `policy` setting. Without a selected
-policy, the launcher leaves policy selection to OpenShell.
+policy, the launcher fails before image checks, Git identity lookup, or sandbox
+creation. Selected policies must exist and be regular files; CLI paths resolve
+relative to the caller and TOML paths relative to the selected configuration.
+The explicit `--no-policy` option clears a configured policy and delegates
+selection to OpenShell. OpenShell may select an environment or image policy;
+its restrictive default applies only when no other policy source exists.
+See ADR-0035.
 
 Providers define credential bindings and endpoint rules independently of
 filesystem grants. Import and create only the providers needed for a session;

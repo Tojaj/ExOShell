@@ -88,7 +88,15 @@ def parser(*, prog: str = "run-exoshell-agent.sh") -> argparse.ArgumentParser:
     providers = result.add_mutually_exclusive_group()
     providers.add_argument("--provider", action="append", dest="providers", metavar="NAME")
     providers.add_argument("--no-providers", action="store_true")
-    _nullable_path_option(result, "policy", "sandbox policy YAML")
+    policy = result.add_mutually_exclusive_group()
+    policy.add_argument(
+        "--policy", type=Path,
+        help="sandbox policy YAML file (required unless configured or --no-policy is supplied)",
+    )
+    policy.add_argument(
+        "--no-policy", action="store_true",
+        help="clear configured policy and let OpenShell select an environment, image, or default policy",
+    )
     _nullable_path_option(result, "kubeconfig", "kubeconfig file")
     _nullable_host_option(result, "github", "GitHub")
     _nullable_host_option(result, "gitlab", "GitLab")
@@ -282,6 +290,12 @@ def resolve_settings(args: argparse.Namespace, config: dict[str, Any], *, cwd: P
         if host is not None and not HOST_RE.fullmatch(host):
             raise LauncherError(f"invalid {display_name} host: {host!r}")
     settings.pop("agents", None)
+    if settings["policy"] is None and not args.no_policy:
+        raise LauncherError(
+            "no sandbox policy selected; use --policy PATH or set 'policy' in your TOML "
+            "configuration, or explicitly use --no-policy to let OpenShell select its policy "
+            "(which may come from the image rather than the restrictive default)"
+        )
     return settings
 
 

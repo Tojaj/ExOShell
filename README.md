@@ -79,8 +79,9 @@ Codex is the default.
 - **Optional service integrations.** The runner can mount a kubeconfig
   read-only and set `KUBECONFIG`. It can also initialize short-lived Google
   Workspace CLI credentials in tmpfs from provider placeholders.
-- **Policy and local-image checks.** The runner can apply a selected sandbox
-  policy. It also fails early when a requested localhost image is unavailable.
+- **Policy and local-image checks.** The runner requires a selected sandbox
+  policy file unless `--no-policy` is supplied. It fails early when that file
+  or a requested localhost image is unavailable.
 - **Ephemeral labeled sandboxes.** OpenShell generates sandbox names. The
   runner labels each sandbox by project and agent, then deletes it after the
   agent exits by default.
@@ -232,6 +233,20 @@ or YAML output to inspect them. CLI `--provider` options replace the complete
 common-plus-agent list; `--no-providers` clears it. Other settings can be
 cleared with `--no-policy`, `--no-kubeconfig`, or
 `--no-github-host` or `--no-gitlab-host`.
+
+Select a policy with `--policy /path/to/policy.yaml` or the TOML `policy`
+setting. The launcher stops before provisioning if no policy is selected or
+the selected path does not exist or is not a regular file. CLI paths resolve
+relative to the caller's directory; TOML paths resolve relative to the selected
+configuration file. For the portable baseline, pass the path to
+[`policies/policy.yaml`](policies/policy.yaml) in your ExOShell checkout.
+
+Explicit `--no-policy` clears any configured policy and lets OpenShell select
+one. This can select an environment or inherited image policy, including the
+community base image's policy. OpenShell's restrictive default applies only
+when no other policy source exists; see its
+[default-policy documentation](https://docs.nvidia.com/openshell/how-it-works/policies/default-policy)
+and [ADR-0035](adrs/adr0035-explicit-launcher-policy-selection.md).
 
 GWS initialization is automatic when an attached provider supplies non-empty
 `GWS_CLIENT_ID`, `GWS_CLIENT_SECRET`, and `GWS_REFRESH_TOKEN` values. Remove

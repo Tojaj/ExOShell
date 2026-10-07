@@ -103,16 +103,85 @@ class DiscoveryTests(unittest.TestCase):
             self.assertEqual(launcher.run(arguments, cwd=self.cwd), 0)
         return execute.call_args.args[0]
 
+    def assert_policy_rejected_before_subprocesses(self, arguments: list[str], message: str) -> None:
+        with mock.patch.object(launcher, "git_identity") as identity, \
+             mock.patch.object(launcher.subprocess, "run") as execute:
+            with self.assertRaisesRegex(launcher.LauncherError, message):
+                launcher.run(arguments, cwd=self.cwd)
+            identity.assert_not_called()
+            execute.assert_not_called()
+
+    def test_missing_policy_stops_launch_without_config_or_with_partial_config(self) -> None:
+        for content in (None, "", 'image = "registry.example/local"\n'):
+            with self.subTest(content=content):
+                if content is not None:
+                    self.local.write_text(content)
+                self.assert_policy_rejected_before_subprocesses([], "no sandbox policy selected")
+        with mock.patch.object(sys, "argv", ["run-exoshell-agent.sh"]), \
+             mock.patch.object(Path, "cwd", return_value=self.cwd), \
+             mock.patch.object(sys, "stderr", new_callable=io.StringIO) as stderr, \
+             mock.patch.object(launcher.subprocess, "run") as execute:
+            self.assertEqual(launcher.main(), 2)
+            execute.assert_not_called()
+        for remedy in ("--policy PATH", "'policy'", "--no-policy"):
+            self.assertIn(remedy, stderr.getvalue())
+
+    def test_invalid_selected_policy_paths_stop_before_subprocesses(self) -> None:
+        directory = self.cwd / "directory.yaml"
+        directory.mkdir()
+        dangling = self.cwd / "dangling.yaml"
+        dangling.symlink_to(self.cwd / "missing.yaml")
+        for path in (self.cwd / "missing.yaml", directory, dangling):
+            for source in ("cli", "discovered", "explicit"):
+                with self.subTest(path=path, source=source):
+                    if self.local.exists():
+                        self.local.unlink()
+                    if source == "cli":
+                        arguments = ["--policy", path.name]
+                    else:
+                        self.local.write_text(f'policy = "{path.name}"\n')
+                        arguments = ["--config", str(self.local)] if source == "explicit" else []
+                    self.assert_policy_rejected_before_subprocesses(
+                        arguments, "policy file does not exist"
+                    )
+
+    def test_valid_policy_paths_resolve_relative_to_source_and_follow_symlinks(self) -> None:
+        cli_policy = self.cwd / "policy with spaces.yaml"
+        cli_policy.write_text("network_policies: {}\n")
+        configured_policy = self.user.parent / cli_policy.name
+        configured_policy.write_text("network_policies: {}\n")
+        cli_link = self.cwd / "linked.yaml"
+        cli_link.symlink_to(cli_policy)
+        config_link = self.user.parent / cli_link.name
+        config_link.symlink_to(configured_policy)
+        for relative in (cli_policy.name, cli_link.name):
+            with self.subTest(relative=relative):
+                command = self.command("--policy", relative)
+                self.assertEqual(command[command.index("--policy") + 1], str(cli_policy))
+                self.user.write_text(f'policy = "{relative}"\n')
+                command = self.command("--config", str(self.user))
+                self.assertEqual(command[command.index("--policy") + 1], str(configured_policy))
+
+    def test_cli_policy_override_and_opt_out_ignore_invalid_configured_path(self) -> None:
+        self.local.write_text('policy = "missing.yaml"\n')
+        replacement = self.cwd / "replacement.yaml"
+        replacement.write_text("network_policies: {}\n")
+        command = self.command("--policy", replacement.name)
+        self.assertEqual(command[command.index("--policy") + 1], str(replacement))
+        self.assertNotIn("--policy", self.command("--no-policy"))
+        self.local.unlink()
+        self.assertNotIn("--policy", self.command("--no-policy"))
+
     def test_each_location_and_precedence_then_defaults(self) -> None:
         for name, path in (("caller", self.local), ("user", self.user), ("system", self.system)):
             path.write_text(f'image = "registry.example/{name}"\n')
         for name, path in (("caller", self.local), ("user", self.user), ("system", self.system)):
             with self.subTest(location=name):
                 self.assertEqual(launcher.discover_config(None, cwd=self.cwd), path)
-                self.assertIn(f"registry.example/{name}", self.command())
+                self.assertIn(f"registry.example/{name}", self.command("--no-policy"))
                 path.unlink()
         self.assertIsNone(launcher.discover_config(None, cwd=self.cwd))
-        command = self.command()
+        command = self.command("--no-policy")
         self.assertIn(launcher.DEFAULTS["image"], command)
         self.assertIn("exoshell-codex", command)
 
@@ -124,7 +193,7 @@ class DiscoveryTests(unittest.TestCase):
         for argument in (explicit.name, str(explicit)):
             with self.subTest(argument=argument):
                 self.assertEqual(launcher.discover_config(Path(argument), cwd=self.cwd), explicit)
-                self.assertIn("registry.example/explicit", self.command("--config", argument))
+                self.assertIn("registry.example/explicit", self.command("--no-policy", "--config", argument))
         self.user.write_text('image = "registry.example/user"\n')
         with self.assertRaisesRegex(launcher.LauncherError, "does not exist"):
             self.command("--config", "missing.toml")
@@ -150,7 +219,7 @@ class DiscoveryTests(unittest.TestCase):
                                ('image = "registry.example/local"\n', "registry.example/local")):
             with self.subTest(content=content):
                 self.local.write_text(content)
-                command = self.command()
+                command = self.command("--no-policy")
                 self.assertIn(image, command)
                 self.assertIn("codex", command)
                 self.assertIn("exoshell-codex", command)
@@ -268,7 +337,7 @@ class DiscoveryTests(unittest.TestCase):
         }
 
     def test_verbose_aliases_defaults_and_silent_normal_launch(self) -> None:
-        self.assertEqual(self.verbose_values(), {})
+        self.assertEqual(self.verbose_values("--no-policy"), {})
         expected = {
             "config": "built-in defaults", "agent": "codex",
             "image": launcher.DEFAULTS["image"], "providers": ["exoshell-codex"],
@@ -278,7 +347,7 @@ class DiscoveryTests(unittest.TestCase):
         }
         for arguments in (("-v",), ("--verbose",), ("-v", "--verbose")):
             with self.subTest(arguments=arguments):
-                values = self.verbose_values(*arguments)
+                values = self.verbose_values("--no-policy", *arguments)
                 self.assertEqual(values, expected)
                 self.assertEqual(list(values), list(expected))
 
@@ -287,13 +356,13 @@ class DiscoveryTests(unittest.TestCase):
             path.write_text('image = "registry.example/test"\n')
         for path in (self.local, self.user, self.system):
             with self.subTest(path=path):
-                self.assertEqual(self.verbose_values("-v")["config"], str(path))
+                self.assertEqual(self.verbose_values("-v", "--no-policy")["config"], str(path))
                 path.unlink()
         explicit = self.cwd / "custom config.toml"
         explicit.write_text('image = "registry.example/explicit"\n')
         link = self.cwd / "linked.toml"
         link.symlink_to(explicit)
-        values = self.verbose_values("--verbose", "--config", link.name)
+        values = self.verbose_values("--verbose", "--no-policy", "--config", link.name)
         self.assertEqual(values["config"], str(explicit))
         self.assertEqual(values["image"], "registry.example/explicit")
 
@@ -352,13 +421,14 @@ class DiscoveryTests(unittest.TestCase):
             with mock.patch.object(launcher.subprocess, "run", side_effect=check_output), \
                  mock.patch.object(launcher, "git_identity", side_effect=check_identity), \
                  mock.patch.object(stderr, "flush", wraps=stderr.flush) as flush:
-                self.assertEqual(launcher.run(["-v"], cwd=self.cwd), 0)
+                self.assertEqual(launcher.run(["-v", "--no-policy"], cwd=self.cwd), 0)
                 self.assertEqual(flush.call_count, 12)
 
 
 class ResolutionTests(unittest.TestCase):
     def parse(self, *arguments: str) -> argparse.Namespace:
-        return launcher.parser().parse_args(arguments)
+        # These tests exercise settings unrelated to policy selection.
+        return launcher.parser().parse_args(["--no-policy", *arguments])
 
     def test_codex_defaults(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
@@ -605,7 +675,7 @@ class LauncherIntegrationTests(unittest.TestCase):
             for flags in ([], ["-v"], ["--verbose"]):
                 result = subprocess.run(
                     [str(ROOT / "run-exoshell-agent.sh"), "--config", str(config),
-                     *flags, "--", "-v", "--verbose", "private agent argument"],
+                     *flags, "--no-policy", "--", "-v", "--verbose", "private agent argument"],
                     cwd=root, env=environment, capture_output=True, text=True,
                 )
                 self.assertEqual(result.returncode, 0, result.stderr)
@@ -645,7 +715,7 @@ class LauncherIntegrationTests(unittest.TestCase):
             for expected in ("localhost/test-image:latest", "registry.example/user"):
                 with self.subTest(expected=expected):
                     result = subprocess.run(
-                        [str(checkout / "run-exoshell-agent.sh"), str(project)],
+                        [str(checkout / "run-exoshell-agent.sh"), "--no-policy", str(project)],
                         cwd=caller, env=environment, capture_output=True, text=True,
                     )
                     self.assertEqual(result.returncode, 0, result.stderr)
