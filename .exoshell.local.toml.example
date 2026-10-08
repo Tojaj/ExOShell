@@ -21,6 +21,8 @@ agent = "codex"
 providers = ["exoshell-github", "exoshell-gws"]
 # Optionally add only the package registries this project needs:
 # providers = ["exoshell-github", "exoshell-gws", "exoshell-npm-registry-ro", "exoshell-pypi-packages-ro", "exoshell-ghcr-registry-ro", "exoshell-dockerhub-registry-ro", "exoshell-quay-registry-ro"]
+# Ubuntu APT repository access (system installs also need filesystem permissions):
+# Add "exoshell-ubuntu-apt-ro" to the common providers array above.
 
 # Optional integrations are disabled when omitted.
 # policy = "policies/policy.yaml"

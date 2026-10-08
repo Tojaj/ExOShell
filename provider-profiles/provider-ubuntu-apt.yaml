@@ -1,0 +1,76 @@
+# Ubuntu package indexes and artifacts. Stock Ubuntu sources use HTTP;
+# HTTPS is also supported without changing the sandbox's source configuration.
+# APT's https helper resolves to http. OpenShell matches resolved executables.
+# Network access only: system installation still needs suitable filesystem
+# permissions and privileges; the baseline policy keeps system paths read-only.
+id: exoshell-ubuntu-apt-ro
+annotations:
+  exoshell-origin: ExOShell
+display_name: ExOShell Ubuntu APT packages (read-only)
+description: Official Ubuntu archive, security, ports and old-release package downloads
+category: data
+endpoints:
+  - host: archive.ubuntu.com
+    port: 80
+    path: /ubuntu/**
+    protocol: rest
+    access: read-only
+    enforcement: enforce
+  - host: archive.ubuntu.com
+    port: 443
+    path: /ubuntu/**
+    protocol: rest
+    access: read-only
+    enforcement: enforce
+  - host: security.ubuntu.com
+    port: 80
+    path: /ubuntu/**
+    protocol: rest
+    access: read-only
+    enforcement: enforce
+  - host: security.ubuntu.com
+    port: 443
+    path: /ubuntu/**
+    protocol: rest
+    access: read-only
+    enforcement: enforce
+  - host: ports.ubuntu.com
+    port: 80
+    path: /ubuntu-ports/**
+    protocol: rest
+    access: read-only
+    enforcement: enforce
+  - host: ports.ubuntu.com
+    port: 443
+    path: /ubuntu-ports/**
+    protocol: rest
+    access: read-only
+    enforcement: enforce
+  - host: old-releases.ubuntu.com
+    port: 80
+    path: /ubuntu/**
+    protocol: rest
+    access: read-only
+    enforcement: enforce
+  - host: old-releases.ubuntu.com
+    port: 443
+    path: /ubuntu/**
+    protocol: rest
+    access: read-only
+    enforcement: enforce
+binaries:
+  - /usr/bin/apt
+  - /usr/bin/apt-get
+  - /usr/lib/apt/methods/http
+  - /usr/lib/apt/methods/https
+  - /usr/bin/codex
+  - /usr/local/bin/codex
+  - /usr/lib/node_modules/@openai/**
+  - /sandbox/.codex/packages/app-server-daemon/releases/*/bin/codex
+  - /usr/bin/claude
+  - /usr/local/bin/claude
+  - /usr/bin/opencode
+  - /usr/local/bin/opencode
+  - /usr/lib/node_modules/opencode-ai/bin/opencode.exe
+  - /usr/lib/node_modules/opencode-ai/**
+  - /usr/bin/curl

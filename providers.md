@@ -36,9 +36,10 @@ read-only. `-publish` is reserved for future publishing profiles.
 
 ## Opt-in package registries
 
-Seven independent, credential-free profiles grant package or container image
-downloads and metadata lookups over HTTPS. None is attached by default or grants
-publishing access:
+Eight independent, credential-free profiles grant package or container image
+downloads and metadata lookups over HTTPS. Ubuntu APT also supports HTTP for
+stock source configurations. None is attached by default or grants publishing
+access:
 
 | Profile / instance | Public endpoints | Client operations |
 | --- | --- | --- |
@@ -46,11 +47,12 @@ publishing access:
 | `exoshell-pypi-packages-ro` | `pypi.org`, `files.pythonhosted.org` | pip/uv indexes, metadata and downloads |
 | `exoshell-go-modules-ro` | `proxy.golang.org`, `sum.golang.org` | Go proxy resolution and checksum verification |
 | `exoshell-cargo-crates-ro` | `index.crates.io`, `static.crates.io`, `crates.io` | Cargo index, downloads, search and metadata |
+| `exoshell-ubuntu-apt-ro` | `archive.ubuntu.com`, `security.ubuntu.com`, `ports.ubuntu.com`, `old-releases.ubuntu.com` | APT indexes and package downloads over HTTP/HTTPS |
 | `exoshell-ghcr-registry-ro` | `ghcr.io`, `pkg-containers.githubusercontent.com` | Public OCI image and artifact reads by agents, `curl`, `oras`, `skopeo`, and Python tools |
 | `exoshell-dockerhub-registry-ro` | `registry-1.docker.io`, `auth.docker.io`, `production.cloudfront.docker.com`, `docker-images-prod.6aa30f8b08e16409b46e0173d6de2f56.r2.cloudflarestorage.com` | Public OCI image and artifact reads by agents, `curl`, `oras`, `skopeo`, and Python tools |
 | `exoshell-quay-registry-ro` | `quay.io`, `cdn.quay.io`, `cdn01.quay.io` through `cdn06.quay.io` | Public OCI image and artifact reads by agents, `curl`, `oras`, `skopeo`, and Python tools |
 
-All seven allow GET/HEAD/OPTIONS; npm alone also allows POST to
+All eight allow GET/HEAD/OPTIONS; npm alone also allows POST to
 `/-/npm/v1/security/advisories/bulk` and `/-/npm/v1/security/audits/quick`.
 Publishing, login, and unrelated POST/PUT/PATCH/DELETE requests are not granted.
 
@@ -90,6 +92,54 @@ openshell provider create --name exoshell-quay-registry-ro --type exoshell-quay-
 
 These profiles have no credential discovery. They compose with an agent's
 inference provider; their names select provider *instances*, not profile files.
+
+### Ubuntu APT
+
+```bash
+openshell provider profile lint -f provider-profiles/provider-ubuntu-apt.yaml
+openshell provider profile import -f provider-profiles/provider-ubuntu-apt.yaml
+openshell provider create --name exoshell-ubuntu-apt-ro --type exoshell-ubuntu-apt-ro
+```
+
+Attach the instance alongside the agent's inference provider:
+
+```bash
+./run-exoshell-agent.sh --agent codex \
+  --provider exoshell-codex --provider exoshell-ubuntu-apt-ro \
+  . -- exec 'reply with OK'
+```
+
+CLI provider options replace the configured list; include any other instances
+needed for that launch. For repeat use, add `exoshell-ubuntu-apt-ro` to the common
+`providers` array in `.exoshell.local.toml`.
+
+The profile covers `/ubuntu/**` on the main, security and old-release archives,
+and `/ubuntu-ports/**` on the ports archive, on ports 80 and 443. These paths
+include signed release metadata, package indexes, by-hash files and `.deb`
+artifacts. See Ubuntu's [package archive documentation](https://documentation.ubuntu.com/project/how-ubuntu-is-made/concepts/package-archive/),
+[ports archive](https://ports.ubuntu.com/ubuntu-ports/), and
+[old-release source configuration](https://help.ubuntu.com/community/EOLUpgrades).
+APT uses GET; no upload or authentication endpoints are needed. Package paths
+use ordinary slashes, so `allow_encoded_slash` remains disabled. Country mirrors,
+PPAs, Ubuntu Pro/ESM and third-party repositories need separately reviewed
+profiles and client configuration; attaching this provider does not change
+APT sources.
+
+The binary list includes `apt`, `apt-get`, their resolved HTTP/HTTPS download
+helper, all three agents and `curl`. A read smoke test after attaching is:
+
+```bash
+curl --fail --silent --show-error --output /tmp/ubuntu-InRelease \
+  http://archive.ubuntu.com/ubuntu/dists/noble/InRelease
+```
+
+This grants network access only. The baseline policy keeps `/usr`, `/etc` and
+other system paths read-only, and the sandbox runs as `sandbox`. System package
+installation also requires appropriate privileges and writable APT/dpkg state
+and installation paths. Use a separately configured sandbox policy or add
+packages to a derived image as described in [CUSTOMIZATION.md](CUSTOMIZATION.md).
+
+### Container registry details
 
 The `exoshell-ghcr-registry-ro` profile permits agents, `curl`, `oras`, `skopeo`, and Python
 to read public GHCR tokens, image manifests, and artifacts. GHCR may redirect blob
