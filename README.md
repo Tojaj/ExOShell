@@ -99,7 +99,7 @@ Example:
 
 ### Project paths and mounts
 
-For a disposable workspace with no launcher-supplied host bind mounts, pass
+For a disposable workspace without host project or kubeconfig mounts, pass
 `--no-share`. The agent starts in the image's writable `/workspace`, where it
 can clone a repository and work entirely inside the sandbox:
 
@@ -117,6 +117,17 @@ The `/tmp/gws` tmpfs remains available, and OpenShell manages its own internal
 storage. Cloned repositories and work are discarded when the sandbox is deleted;
 pass `--keep` to retain them. See
 [ADR-0037](adrs/adr0037-optional-host-sharing.md).
+
+User skills are opt-in. Set `skills = ["~/.agents/skills", "/path/to/skill"]`
+in your launcher TOML, or pass repeatable `--skill PATH` options to replace
+the configured list. Each source is an individual skill containing `SKILL.md`
+or a collection of immediate child skills. `--no-skills` disables imports.
+The launcher copies symlink targets into a temporary snapshot and the image
+copies it into `/sandbox/.agents/skills` before starting the agent. Claude's
+skills directory links to that same directory. Duplicate names, including
+collisions with image skills, are errors. Configured skill imports still apply
+with `--no-share`, using a read-only snapshot mount. Rebuild your images before
+using imports; see [user skills customization](CUSTOMIZATION.md#user-skills).
 
 For launches that share a host project, the following path rules apply.
 

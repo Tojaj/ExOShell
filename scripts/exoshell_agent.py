@@ -8,15 +8,18 @@ import json
 import os
 from pathlib import Path
 import re
+import shutil
 import stat
 import subprocess
 import sys
+import tempfile
 import tomllib
 from typing import Any, Sequence
 
 
 CONTAINER_WORKSPACE = "/workspace"
 CONTAINER_HOME = "/sandbox"
+CONTAINER_SKILLS_SNAPSHOT = "/tmp/exoshell-skills"
 SYSTEM_CONFIG_FILE = Path("/etc/exoshell/exoshell.local.toml")
 AGENTS: dict[str, dict[str, Any]] = {
     "codex": {
@@ -43,6 +46,7 @@ DEFAULTS: dict[str, Any] = {
     "keep": False,
     "model": None,
     "effort": None,
+    "skills": [],
 }
 CONFIG_KEYS = (set(DEFAULTS) - {"keep", "model", "effort"}) | {"agents", "host_share"}
 PATH_KEYS = {"host_share", "policy", "kubeconfig"}
@@ -94,6 +98,10 @@ def parser(*, prog: str = "run-exoshell-agent.sh") -> argparse.ArgumentParser:
         help="retain the sandbox after the agent exits (for debugging)",
     )
     result.add_argument("--host-share", type=Path, help="host directory mounted at /workspace")
+    skills = result.add_mutually_exclusive_group()
+    skills.add_argument("--skill", action="append", dest="skills", metavar="PATH",
+                        help="skill or collection directory (repeatable; replaces configured skills)")
+    skills.add_argument("--no-skills", action="store_true", help="ignore configured skill sources")
     result.add_argument(
         "--no-share", action="store_true",
         help="use a disposable /workspace without host project or kubeconfig mounts",
@@ -196,7 +204,10 @@ def load_config(path: Path, *, required: bool) -> dict[str, Any]:
         raise LauncherError(f"unknown configuration key(s): {', '.join(unknown)}")
 
     for key, value in data.items():
-        if key == "providers":
+        if key == "skills":
+            if not isinstance(value, list) or any(type(item) is not str or not item.strip() for item in value):
+                raise LauncherError("configuration key 'skills' must be an array of non-empty paths")
+        elif key == "providers":
             _provider_list(value, key)
         elif key == "agents":
             if not isinstance(value, dict):
@@ -229,6 +240,8 @@ def load_config(path: Path, *, required: bool) -> dict[str, Any]:
 
     for key in PATH_KEYS & data.keys():
         data[key] = _resolve_path(data[key], path.parent)
+    if "skills" in data:
+        data["skills"] = [_resolve_path(item, path.parent) for item in data["skills"]]
     return data
 
 
@@ -270,6 +283,13 @@ def resolve_settings(args: argparse.Namespace, config: dict[str, Any], *, cwd: P
         settings["image"] = args.image
     if args.keep:
         settings["keep"] = True
+    selected_skills = [] if args.no_skills else (
+        args.skills if args.skills is not None else settings["skills"]
+    )
+    if any(not str(item).strip() for item in selected_skills):
+        raise LauncherError("--skill cannot be empty")
+    # Keep the final symlink's name: it may be a deliberate skill alias.
+    settings["skills"] = [Path(os.path.abspath(_resolve_path(item, cwd))) for item in selected_skills]
 
     if args.host_share is not None:
         settings["host_share"] = _resolve_path(args.host_share, cwd)
@@ -358,6 +378,54 @@ def project_label(project: Path | None) -> str:
     return normalized[:63] or "project"
 
 
+def select_skills(sources: Sequence[Path]) -> dict[str, Path]:
+    """Select individual skills or immediate collection children, preserving aliases."""
+    selected: dict[str, Path] = {}
+    try:
+        for source in sources:
+            if not stat.S_ISDIR(source.stat().st_mode):
+                raise LauncherError(f"skill source is not a directory: {source}")
+            if (source / "SKILL.md").exists():
+                candidates = [source]
+            else:
+                candidates = []
+                for child in sorted(source.iterdir()):
+                    if stat.S_ISDIR(child.stat().st_mode) and (child / "SKILL.md").exists():
+                        candidates.append(child)
+            for skill in candidates:
+                if not (skill / "SKILL.md").is_file():
+                    raise LauncherError(f"SKILL.md is not a regular file: {skill}")
+                if not skill.name:
+                    raise LauncherError(f"skill directory needs a name: {skill}")
+                if skill.name in selected:
+                    raise LauncherError(f"duplicate skill '{skill.name}': {selected[skill.name]} and {skill}")
+                selected[skill.name] = skill
+    except (OSError, RuntimeError) as error:
+        raise LauncherError(f"cannot inspect skill sources: {error}") from error
+    return selected
+
+
+def copy_skill_snapshot(source: Path, destination: Path,
+                        ancestors: frozenset[tuple[int, int]] = frozenset()) -> None:
+    """Materialize links without following a directory cycle or copying special files."""
+    try:
+        metadata = source.stat()
+        if stat.S_ISDIR(metadata.st_mode):
+            identity = (metadata.st_dev, metadata.st_ino)
+            if identity in ancestors:
+                raise LauncherError(f"skill directory cycle: {source}")
+            destination.mkdir(mode=0o700)
+            for child in sorted(source.iterdir()):
+                copy_skill_snapshot(child, destination / child.name, ancestors | {identity})
+        elif stat.S_ISREG(metadata.st_mode):
+            shutil.copyfile(source, destination)
+            destination.chmod(0o600 | (metadata.st_mode & 0o111))
+        else:
+            raise LauncherError(f"unsupported special file in skill: {source}")
+    except (OSError, RuntimeError) as error:
+        raise LauncherError(f"cannot copy skill path {source}: {error}") from error
+
+
 def mount_config(settings: dict[str, Any]) -> dict[str, Any]:
     """Build Podman mount configuration for the sandbox."""
     mounts: list[dict[str, Any]] = []
@@ -381,6 +449,10 @@ def mount_config(settings: dict[str, Any]) -> dict[str, Any]:
                 "selinux_label": "shared",
             }
         )
+    if settings.get("skills_snapshot") is not None:
+        mounts.append({"type": "bind", "source": str(settings["skills_snapshot"]),
+                       "target": CONTAINER_SKILLS_SNAPSHOT, "read_only": True,
+                       "selinux_label": "shared"})
     # Provision storage even when GWS is attached after sandbox creation.
     mounts.append({"type": "tmpfs", "target": "/tmp/gws", "mode": 0o777})
     return {"podman": {"mounts": mounts}}
@@ -554,10 +626,19 @@ def create_command(
         command.extend(["--policy", str(settings["policy"])])
     selected_command, environment_settings = agent_command(settings, agent_args)
     command.extend(environment_args(environment_settings, name, email))
+    if settings.get("skills_snapshot") is not None:
+        command.extend(["--env", f"EXOSHELL_SKILLS_SNAPSHOT={CONTAINER_SKILLS_SNAPSHOT}"])
     command.append("--driver-config-json=" + json.dumps(mount_config(settings), separators=(",", ":")))
+    command.append("--")
+    if settings.get("skills_snapshot") is not None:
+        # Older images must fail rather than silently starting without imports.
+        command.extend(["/bin/sh", "-c",
+                        'if [ ! -f /etc/exoshell/skills-import-v1 ]; then '
+                        'echo "exoshell: image lacks skill import support; rebuild the sandbox image" >&2; '
+                        'exit 2; fi; exec "$@"', "exoshell-skills"])
     command.extend(
         [
-            "--", "/usr/local/bin/exoshell-agent", settings["container_project"], "--",
+            "/usr/local/bin/exoshell-agent", settings["container_project"], "--",
             *selected_command,
         ]
     )
@@ -571,6 +652,8 @@ def is_local_image(image: str) -> bool:
 def _verbose_value(key: str, value: Any) -> None:
     if isinstance(value, Path):
         value = str(value)
+    elif isinstance(value, list):
+        value = [str(item) if isinstance(item, Path) else item for item in value]
     print(f"exoshell: {key} = {json.dumps(value)}", file=sys.stderr, flush=True)
 
 
@@ -594,9 +677,21 @@ def run(argv: Sequence[str], *, cwd: Path) -> int:
     if args.verbose:
         for key in (
             "agent", "model", "effort", "image", "providers", "policy", "kubeconfig", "github_host",
-            "gitlab_host", "keep", "no_share", "host_share", "project", "container_project",
+            "gitlab_host", "keep", "no_share", "host_share", "project", "container_project", "skills",
         ):
             _verbose_value(key, settings[key])
+    selected_skills = select_skills(settings["skills"])
+    if not selected_skills:
+        return launch(settings, agent_args)
+    with tempfile.TemporaryDirectory(prefix="exoshell-skills-") as temporary:
+        settings["skills_snapshot"] = Path(temporary)
+        for skill_name, source in selected_skills.items():
+            copy_skill_snapshot(source, Path(temporary) / skill_name)
+        return launch(settings, agent_args)
+
+
+def launch(settings: dict[str, Any], agent_args: Sequence[str]) -> int:
+    """Check the image and launch while any skill snapshot remains alive."""
     if is_local_image(settings["image"]):
         try:
             image_result = subprocess.run(["podman", "image", "exists", settings["image"]])

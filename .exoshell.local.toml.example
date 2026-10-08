@@ -29,6 +29,9 @@ providers = ["exoshell-github", "exoshell-gws"]
 # kubeconfig = "/home/you/.kube/config"
 # github_host = "github.example.com"
 # gitlab_host = "gitlab.example.com"
+# Skill sources are opt-in: an individual skill or a collection of skills.
+# Symlinks are expanded into copies; names must not collide with image skills.
+# skills = ["~/.agents/skills", "../shared-skills", "../tools/example-skill"]
 
 [agents.codex]
 providers = ["exoshell-codex"]

@@ -22,6 +22,8 @@ filesystem_policy:
     # Agent runtime state is writable and discarded with the sandbox.
     - /sandbox/.codex
     - /sandbox/.claude
+    # Claude's skills link resolves here; imports are copied before agent startup.
+    - /sandbox/.agents/skills
     - /sandbox/.config/opencode
     - /sandbox/.cache/opencode
     - /sandbox/.local/share/opencode

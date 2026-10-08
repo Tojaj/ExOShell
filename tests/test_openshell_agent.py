@@ -346,6 +346,7 @@ class DiscoveryTests(unittest.TestCase):
             "policy": None, "kubeconfig": None, "github_host": None,
             "gitlab_host": None, "keep": False, "no_share": False, "host_share": str(self.cwd),
             "project": str(self.cwd), "container_project": "/workspace",
+            "skills": [],
         }
         for arguments in (("-v",), ("--verbose",), ("-v", "--verbose")):
             with self.subTest(arguments=arguments):
@@ -424,7 +425,7 @@ class DiscoveryTests(unittest.TestCase):
                  mock.patch.object(launcher, "git_identity", side_effect=check_identity), \
                  mock.patch.object(stderr, "flush", wraps=stderr.flush) as flush:
                 self.assertEqual(launcher.run(["-v", "--no-policy"], cwd=self.cwd), 0)
-            self.assertEqual(flush.call_count, 15)
+            self.assertEqual(flush.call_count, 16)
 
 
 class ResolutionTests(unittest.TestCase):

@@ -150,8 +150,13 @@ RUN chmod 0755 /usr/local/bin/uv /usr/local/bin/uvx \
 # ownership metadata for the inherited home directory.
 RUN install -d -o sandbox -g sandbox \
         /sandbox/.kube /sandbox/.codex /sandbox/.claude \
-        /sandbox/.claude/skills /sandbox/.config/opencode \
+        /sandbox/.agents/skills /sandbox/.config/opencode \
         /sandbox/.cache/opencode /sandbox/.local/share/opencode /workspace
+# Community base supplies per-skill links. Remove only links and require the
+# directory to be empty, so unexpected Claude-only skill content is preserved.
+RUN find /sandbox/.claude/skills -mindepth 1 -maxdepth 1 -type l -delete \
+    && rmdir /sandbox/.claude/skills \
+    && ln -s ../.agents/skills /sandbox/.claude/skills
 
 ENV GLAB_CONFIG_DIR=/etc/glab-cli \
     GLAB_CHECK_UPDATE=false
@@ -164,6 +169,7 @@ COPY --chmod=0644 agent-instructions/ /etc/exoshell/instructions/
 COPY --chmod=0644 render-agent-instructions.py /usr/local/lib/exoshell/render-agent-instructions.py
 RUN python3 /usr/local/lib/exoshell/render-agent-instructions.py
 COPY --chmod=0755 exoshell-agent /usr/local/bin/exoshell-agent
+RUN touch /etc/exoshell/skills-import-v1
 # Global defaults keep the image-pinned OpenCode version from updating while
 # allowing project configuration to override them.
 COPY --chown=sandbox:sandbox --chmod=0644 opencode.json /sandbox/.config/opencode/opencode.json
@@ -178,11 +184,7 @@ COPY --chmod=0644 claude.config.json /etc/exoshell/claude-atlassian.json
 # image-provided template; provider placeholders remain the only credentials.
 COPY --chown=sandbox:sandbox skills/ /sandbox/.agents/skills/
 COPY --chown=sandbox:sandbox glab-config.yml /etc/glab-cli/config.yml
-RUN chmod 0600 /etc/glab-cli/config.yml \
-    && for skill in /sandbox/.agents/skills/*/; do \
-         [ -d "$skill" ] || continue; \
-         ln -sfn "$skill" "/sandbox/.claude/skills/$(basename "$skill")"; \
-       done
+RUN chmod 0600 /etc/glab-cli/config.yml
 
 WORKDIR /sandbox
 USER sandbox

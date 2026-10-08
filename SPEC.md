@@ -53,12 +53,41 @@ Paths are resolved before launch, including symlinks. The image entry point
 validates the container project path and starts the agent there.
 
 The CLI-only `--no-share` option starts the agent in the image's writable
-`/workspace` without launcher-supplied host bind mounts. It clears configured
+`/workspace` without project or kubeconfig host bind mounts. It clears configured
 `host_share` and `kubeconfig` paths before checking their existence and rejects
 explicit `--host-share`, `--kubeconfig`, or positional project arguments.
 The host project and share are absent; configuration discovery, policy selection,
 providers, and the `/tmp/gws` tmpfs still apply. OpenShell manages its own
 internal storage. See ADR-0037.
+
+The optional common `skills` setting is an array of directory paths, defaulting
+to `[]`. A source containing a regular `SKILL.md` selects one skill; otherwise,
+its immediate child directories containing `SKILL.md` form a collection.
+Collection-level files and unrelated directories are ignored; empty collections
+are allowed. TOML paths use the selected config directory, CLI paths use the
+caller directory, and `~` expands to the host home. Repeatable `--skill PATH`
+options replace the configured list; `--no-skills` suppresses it without checking
+configured sources. Destination names preserve directory names and symlink aliases.
+
+Before provisioning, the launcher copies complete selected skill directories
+into a private temporary snapshot, dereferencing file and directory symlinks
+and preserving executable permissions. Missing or unreadable paths, broken
+links, directory cycles, special files, and duplicate destination names are
+errors. Sources remain independent of the snapshot. A read-only snapshot bind
+mount at `/tmp/exoshell-skills` supplies startup input; original skill sources
+receive no additional mounts. This import also applies with `--no-share`.
+
+Rebuilt images copy the snapshot into `/sandbox/.agents/skills` before other
+agent initialization. All destination names are checked first; collisions with
+any existing entry abort startup without replacing image skills. Copy failures
+also stop startup. An image capability marker makes older images fail with a
+rebuild message instead of silently skipping imports. The helper removes its
+internal snapshot setting from the agent environment. Host staging is cleaned
+up when the OpenShell subprocess returns, including failures and interruption;
+`--keep` retains imported container copies. A directory symlink from
+`/sandbox/.claude/skills` to `../.agents/skills` exposes the same skills to Claude.
+The baseline policy grants the real skills directory read/write access.
+See ADR-0038.
 
 The launcher injects the selected project's effective Git name and email.
 With `--no-share`, it reads only global host Git configuration and injects
@@ -110,7 +139,9 @@ The CLI-only `-v` / `--verbose` flag reports the absolute selected configuration
 path before loading it, or identifies built-in defaults when no file is selected.
 After successful settings validation, it reports every effective launcher setting,
 including CLI overrides, composed providers, and resolved project and mount paths.
-The `no_share` diagnostic reports the sharing opt-out; suppressed host project,
+The `skills` diagnostic lists absolute source paths without resolving skill
+aliases or reporting contents. The `no_share` diagnostic reports the project
+sharing opt-out; suppressed host project,
 share, and kubeconfig paths are `null`.
 Diagnostics use `exoshell: key = value` lines with JSON values on stderr and are
 flushed before image checks, Git identity lookup, and sandbox creation. File

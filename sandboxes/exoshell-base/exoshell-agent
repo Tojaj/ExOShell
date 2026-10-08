@@ -4,6 +4,7 @@
 import json
 import os
 from pathlib import Path
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -14,11 +15,35 @@ GWS_DIR = Path("/tmp/gws")
 GWS_KEYS = ("GWS_CLIENT_ID", "GWS_CLIENT_SECRET", "GWS_REFRESH_TOKEN")
 ATLASSIAN_KEY = "ATLASSIAN_MCP_BEARER_TOKEN"
 CLAUDE_MCP_TEMPLATE = Path("/etc/exoshell/claude-atlassian.json")
+SKILLS_DIR = Path("/sandbox/.agents/skills")
 
 
 def fail(message: str) -> None:
     print(f"exoshell-agent: {message}", file=sys.stderr)
     raise SystemExit(2)
+
+
+def initialize_skills(environment: dict[str, str], destination: Path = SKILLS_DIR,
+                      snapshot_path: Path = Path("/tmp/exoshell-skills")) -> None:
+    """Copy the launcher snapshot once, preserving every existing image skill."""
+    snapshot = environment.pop("EXOSHELL_SKILLS_SNAPSHOT", None)
+    if snapshot is None:
+        return
+    try:
+        if snapshot != str(snapshot_path):
+            fail("invalid skill snapshot path")
+        sources = sorted(Path(snapshot).iterdir())
+        for source in sources:
+            if source.is_symlink() or not source.is_dir() or not (source / "SKILL.md").is_file():
+                fail(f"invalid skill snapshot entry: {source.name}")
+            target = destination / source.name
+            if target.exists() or target.is_symlink():
+                fail(f"skill '{source.name}' conflicts with an existing sandbox skill")
+        destination.mkdir(mode=0o700, parents=True, exist_ok=True)
+        for source in sources:
+            shutil.copytree(source, destination / source.name)
+    except OSError as error:
+        fail(f"could not import skills: {error}")
 
 
 def object_field(config: dict, key: str) -> dict:
@@ -204,6 +229,7 @@ def main(arguments: list[str]) -> None:
         fail("PROJECT must be a directory below /workspace")
 
     environment = os.environ.copy()
+    initialize_skills(environment)
     initialize_opencode_defaults(arguments[2:], environment)
     command = initialize_atlassian_mcp(arguments[2:], environment, project)
     initialize_gws(environment)

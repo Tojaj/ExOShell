@@ -51,6 +51,8 @@ later cleanup. Existing shared-project launches will retain their behavior.
 - Optional Git identity lets users inspect repositories without host Git setup.
 - No image rebuild is required for the standard image; derived images must
   supply a writable `/workspace`.
+- [ADR-0038](adr0038-user-skill-snapshots.md) later permits explicitly configured
+  skill snapshot mounts in this mode; project and kubeconfig mounts remain suppressed.
 - Tests must cover mount suppression, conflicting arguments, optional identity,
   and the existing lifecycle for all supported agents.
 
