@@ -1,0 +1,39 @@
+# Allow APT to download indexes and packages from the official Ubuntu mirrors.
+# Stock Ubuntu sources use HTTP; HTTPS sources are supported too.
+# Apply from the gateway host:
+#   ./policy-overlays/apply.py --sandbox <sandbox-name> ubuntu-updates.yaml
+# Network access only; installation still requires existing filesystem grants
+# and sufficient privileges. APT's https helper resolves to the http executable.
+network_policies:
+  ubuntu_updates:
+    name: ubuntu-updates
+    endpoints:
+      - host: archive.ubuntu.com
+        port: 80
+        path: /ubuntu/**
+        protocol: rest
+        enforcement: enforce
+        access: read-only
+      - host: archive.ubuntu.com
+        port: 443
+        path: /ubuntu/**
+        protocol: rest
+        enforcement: enforce
+        access: read-only
+      - host: security.ubuntu.com
+        port: 80
+        path: /ubuntu/**
+        protocol: rest
+        enforcement: enforce
+        access: read-only
+      - host: security.ubuntu.com
+        port: 443
+        path: /ubuntu/**
+        protocol: rest
+        enforcement: enforce
+        access: read-only
+    binaries:
+      - { path: /usr/bin/apt }
+      - { path: /usr/bin/apt-get }
+      - { path: /usr/lib/apt/methods/http }
+      - { path: /usr/lib/apt/methods/https }

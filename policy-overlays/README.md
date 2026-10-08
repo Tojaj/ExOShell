@@ -112,6 +112,17 @@ For another GitLab instance, create a separate provider profile, baseline policy
 key, and host-specific overlays. Do not use host substitution: independent,
 named policy entries keep each instance's grants auditable.
 
+## Ubuntu updates
+
+`ubuntu-updates.yaml` allows APT to read `/ubuntu/**` from
+`archive.ubuntu.com` and `security.ubuntu.com` over HTTP and HTTPS. It grants
+network access; package installation still requires suitable filesystem
+permissions and privileges in the sandbox.
+
+```bash
+./policy-overlays/apply.py --sandbox <sandbox-name> ubuntu-updates.yaml
+```
+
 ## Adding an overlay
 
 Repeat every field in any entry that replaces a baseline entry. Keep independent
