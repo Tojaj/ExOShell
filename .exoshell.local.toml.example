@@ -21,6 +21,9 @@ agent = "codex"
 providers = ["exoshell-github", "exoshell-gws"]
 # Optionally add only the package registries this project needs:
 # providers = ["exoshell-github", "exoshell-gws", "exoshell-npm-registry-ro", "exoshell-pypi-packages-ro", "exoshell-ghcr-registry-ro", "exoshell-dockerhub-registry-ro", "exoshell-quay-registry-ro"]
+# pre-commit Python, Node and Go hooks need PyPI, npm and Go respectively.
+# npm and Go profiles also allow their runtime downloads; add
+# "exoshell-go-modules-ro" alongside npm and PyPI for Go hooks such as gitleaks.
 # Ubuntu APT repository access (system installs also need filesystem permissions):
 # Add "exoshell-ubuntu-apt-ro" to the common providers array above.
 

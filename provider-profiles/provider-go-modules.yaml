@@ -1,10 +1,10 @@
-# Network grant only: the ExOShell base image does not install Go. Adjust the
-# Go binary paths to match the image used by the sandbox before importing.
+# Network grant only: the ExOShell base image does not install Go. pre-commit
+# can bootstrap it; adjust binary paths for other images or cache locations.
 id: exoshell-go-modules-ro
 annotations:
   exoshell-origin: ExOShell
 display_name: ExOShell Go modules (read-only)
-description: Official Go module proxy and checksum service, without VCS fallbacks
+description: Official Go runtime downloads, module proxy and checksum service, without VCS fallbacks
 category: data
 endpoints:
   - host: proxy.golang.org
@@ -17,10 +17,30 @@ endpoints:
     protocol: rest
     access: read-only
     enforcement: enforce
+  - host: go.dev
+    port: 443
+    path: /dl/**
+    protocol: rest
+    access: read-only
+    enforcement: enforce
+  # A path selector takes precedence over the baseline's Google audit wildcard.
+  - host: dl.google.com
+    port: 443
+    path: /go/**
+    protocol: rest
+    access: read-only
+    enforcement: enforce
 binaries:
   - /usr/local/go/bin/go
   - /usr/local/bin/go
   - /usr/bin/go
+  - /sandbox/.cache/pre-commit/repo*/golangenv*/.go/bin/go
+  # pre-commit downloads the Go runtime through Python, resolved beyond symlinks.
+  - /sandbox/.uv/python/**
+  - /sandbox/.venv/bin/python
+  - /sandbox/.venv/bin/python3
+  - /usr/bin/python3*
+  - /usr/local/bin/python3*
   - /usr/bin/codex
   - /usr/local/bin/codex
   - /usr/lib/node_modules/@openai/**

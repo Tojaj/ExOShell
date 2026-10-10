@@ -43,9 +43,9 @@ access:
 
 | Profile / instance | Public endpoints | Client operations |
 | --- | --- | --- |
-| `exoshell-npm-registry-ro` | `registry.npmjs.org` | npm install/update, search and audit (only the two npm audit POST paths) |
+| `exoshell-npm-registry-ro` | `registry.npmjs.org`, `nodejs.org` (`/download/release/**`) | npm install/update, search, scoped audit requests and Node runtime downloads |
 | `exoshell-pypi-packages-ro` | `pypi.org`, `files.pythonhosted.org` | pip/uv indexes, metadata and downloads |
-| `exoshell-go-modules-ro` | `proxy.golang.org`, `sum.golang.org` | Go proxy resolution and checksum verification |
+| `exoshell-go-modules-ro` | `proxy.golang.org`, `sum.golang.org`, `go.dev` (`/dl/**`), `dl.google.com` (`/go/**`) | Go runtime downloads, proxy resolution and checksum verification |
 | `exoshell-cargo-crates-ro` | `index.crates.io`, `static.crates.io`, `crates.io` | Cargo index, downloads, search and metadata |
 | `exoshell-ubuntu-apt-ro` | `archive.ubuntu.com`, `security.ubuntu.com`, `ports.ubuntu.com`, `old-releases.ubuntu.com` | APT indexes and package downloads over HTTP/HTTPS |
 | `exoshell-ghcr-registry-ro` | `ghcr.io`, `pkg-containers.githubusercontent.com` | Public OCI image and artifact reads by agents, `curl`, `oras`, `skopeo`, and Python tools |
@@ -92,6 +92,70 @@ openshell provider create --name exoshell-quay-registry-ro --type exoshell-quay-
 
 These profiles have no credential discovery. They compose with an agent's
 inference provider; their names select provider *instances*, not profile files.
+
+### pre-commit runtime setup
+
+Attach npm, PyPI and Go alongside the inference and source-control providers
+when hooks use those ecosystems. For example:
+
+```bash
+openshell provider profile lint -f provider-profiles/provider-go-modules.yaml
+openshell provider profile import -f provider-profiles/provider-go-modules.yaml
+openshell provider create --name exoshell-go-modules-ro --type exoshell-go-modules-ro
+
+./run-exoshell-agent.sh --agent codex \
+  --provider exoshell-codex --provider exoshell-github \
+  --provider exoshell-npm-registry-ro --provider exoshell-pypi-packages-ro \
+  --provider exoshell-go-modules-ro .
+```
+
+Create the other instances first using the instructions above. CLI provider
+options replace the configured list, so include every instance needed for that
+session. For repeat use, add the ecosystem instances to the common `providers`
+array in `.exoshell.local.toml`; an existing npm/PyPI selection also needs
+`exoshell-go-modules-ro` for Go hooks such as gitleaks.
+
+[pre-commit's Go installer](https://raw.githubusercontent.com/pre-commit/pre-commit/main/pre_commit/languages/golang.py)
+queries `go.dev/dl/?mode=json` when resolving the default Go version and fetches
+archives from `dl.google.com/go/`.
+[nodeenv](https://raw.githubusercontent.com/ekalinin/nodeenv/master/nodeenv.py)
+fetches Node metadata and archives from `nodejs.org/download/release/`.
+The npm and Go profiles allow GET/HEAD/OPTIONS on these paths, with enforced
+HTTP inspection. The Go archive path selector also avoids an equal-specificity
+conflict with the shared baseline's `**.google.com` audit endpoint.
+
+Both profiles include the base image's uv-managed Python interpreters and
+pre-commit's downloaded Node or Go executables under
+`/sandbox/.cache/pre-commit/repo*/`. If `PRE_COMMIT_HOME` or `XDG_CACHE_HOME`
+relocates that cache, adapt the executable patterns in a custom profile.
+Other runtime mirrors and unofficial Node builds need separately reviewed
+endpoints. These profiles grant network access; runtime and cache directories
+must also be writable under the selected filesystem policy.
+
+For profiles already imported on the host, import is create-only. Export each
+profile, copy the corresponding repository definition's description, endpoints
+and binaries into the exported document while preserving its `resource_version`
+and other deployment metadata, then lint and update it:
+
+```bash
+openshell provider profile export exoshell-npm-registry-ro -o yaml > /tmp/exoshell-npm-registry-ro.yaml
+openshell provider profile export exoshell-go-modules-ro -o yaml > /tmp/exoshell-go-modules-ro.yaml
+# Edit the exported documents as described above before running these commands.
+openshell provider profile lint -f /tmp/exoshell-npm-registry-ro.yaml
+openshell provider profile lint -f /tmp/exoshell-go-modules-ro.yaml
+openshell provider profile update exoshell-npm-registry-ro -f /tmp/exoshell-npm-registry-ro.yaml
+openshell provider profile update exoshell-go-modules-ro -f /tmp/exoshell-go-modules-ro.yaml
+```
+
+Updates affect every instance of that profile and reach attached running
+sandboxes on their next configuration sync. Inspect the effective policy with
+`openshell policy get <sandbox> --full` before retrying hook installation.
+See [CUSTOMIZATION.md](CUSTOMIZATION.md#lint-and-import-profiles).
+
+For a temporary live network grant, `openshell policy update` accepts multiple
+`--add-endpoint` flags only when `--rule-name` is omitted; a named update accepts
+one endpoint. A broad enforced `dl.google.com` endpoint may conflict with the
+baseline Google audit rule, so prefer the path-scoped profile update above.
 
 ### Ubuntu APT
 
@@ -214,7 +278,8 @@ openshell sandbox create --from localhost/exoshell-local:latest \
 Add the workspace mount and image startup command as described in the
 [image guide](sandboxes/exoshell-base/README.md) when working on a host project.
 The base image supplies npm, uv/uvx and the agents; it does not install Go or
-Cargo. For those clients, use an image with the tools installed and check their
+Cargo. Go hooks can bootstrap Go as described above. For other uses, install
+the tools in a derived image and check their
 kernel-resolved executable paths against the profile `binaries` list (for
 example, `readlink -f "$(command -v go)"`). OpenShell matches the resolved
 executable and its ancestors, not a package-manager script named in argv.
@@ -235,7 +300,8 @@ grants to public registry hosts: attaching only a private clone excludes its
 public counterpart only if no other layer grants it. To avoid Go's default
 direct-VCS fallback, set `GOPROXY=https://proxy.golang.org` (without `,direct`)
 and review `GOPRIVATE`/`GOSUMDB` for the modules in use. Git dependencies and
-interpreter installers are not covered. Maven/Gradle, NuGet, RubyGems, and
+runtime installers beyond the Node and Go paths above are not covered.
+Maven/Gradle, NuGet, RubyGems, and
 Composer can have separate profiles later. See
 [ADR 24](adrs/adr0024-opt-in-package-registry-providers.md).
 

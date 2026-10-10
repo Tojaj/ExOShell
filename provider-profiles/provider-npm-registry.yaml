@@ -1,10 +1,10 @@
-# Anonymous npm registry access. npm's JavaScript launcher runs as node;
+# Anonymous npm registry and Node runtime access. npm's launcher runs as node;
 # OpenShell matches the resolved executable and its ancestors, not argv[0].
 id: exoshell-npm-registry-ro
 annotations:
   exoshell-origin: ExOShell
 display_name: ExOShell npm registry (read and audit; read-only consumption)
-description: npm package metadata, search, downloads and narrowly scoped audit requests
+description: npm package metadata, search, downloads, scoped audit requests and Node runtime downloads
 category: data
 endpoints:
   - host: registry.npmjs.org
@@ -18,10 +18,23 @@ endpoints:
       - allow: { method: OPTIONS, path: "**" }
       - allow: { method: POST, path: "/-/npm/v1/security/advisories/bulk" }
       - allow: { method: POST, path: "/-/npm/v1/security/audits/quick" }
+  - host: nodejs.org
+    port: 443
+    path: /download/release/**
+    protocol: rest
+    access: read-only
+    enforcement: enforce
 binaries:
   - /usr/bin/node
+  - /sandbox/.cache/pre-commit/repo*/node_env*/bin/node
   - /usr/lib/node_modules/npm/bin/npm-cli.js
   - /usr/lib/node_modules/npm/bin/npx-cli.js
+  # pre-commit/nodeenv download runtimes through Python, resolved beyond symlinks.
+  - /sandbox/.uv/python/**
+  - /sandbox/.venv/bin/python
+  - /sandbox/.venv/bin/python3
+  - /usr/bin/python3*
+  - /usr/local/bin/python3*
   - /usr/bin/codex
   - /usr/local/bin/codex
   - /usr/lib/node_modules/@openai/**
