@@ -49,7 +49,10 @@ fresh server stop it and poll `service status` until `stopped`.
 ## Decision
 
 We will pin `@opencode/cli@2.0.31` (npm, same overlay method as before) and
-fully replace the v1 shapes with canonical v2 ones; no v1-key fallback stays:
+fully replace the v1 shapes with canonical v2 ones; no v1-key fallback stays.
+The image uninstalls the `opencode-ai` package first: both packages provide
+an `opencode` bin and npm aborts with EEXIST instead of overwriting another
+package's file (skipped when no v1 package is installed):
 
 - Image `opencode.json` uses `update: "disable"` and
   `mcp.servers.atlassian` (`disabled: true`); `tui.json` becomes `cli.json`
