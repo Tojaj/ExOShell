@@ -56,8 +56,8 @@ network_policies:
     binaries:
       - { path: /usr/bin/opencode }
       - { path: /usr/local/bin/opencode }
-      - { path: /usr/lib/node_modules/opencode-ai/bin/opencode.exe }
-      - { path: /usr/lib/node_modules/opencode-ai/** }
+      - { path: /usr/lib/node_modules/@opencode/cli/bin/opencode.exe }
+      - { path: /usr/lib/node_modules/@opencode/** }
 
   # OpenCode's site also serves account and inference requests, which may POST.
   opencode_site:
@@ -67,8 +67,8 @@ network_policies:
     binaries:
       - { path: /usr/bin/opencode }
       - { path: /usr/local/bin/opencode }
-      - { path: /usr/lib/node_modules/opencode-ai/bin/opencode.exe }
-      - { path: /usr/lib/node_modules/opencode-ai/** }
+      - { path: /usr/lib/node_modules/@opencode/cli/bin/opencode.exe }
+      - { path: /usr/lib/node_modules/@opencode/** }
 
   # The ONE /graphql endpoint for api.github.com.
   #
@@ -192,8 +192,8 @@ network_policies:
     binaries:
       - { path: /usr/local/bin/opencode }
       - { path: /usr/bin/opencode }
-      - { path: /usr/lib/node_modules/opencode-ai/bin/opencode.exe }
-      - { path: /usr/lib/node_modules/opencode-ai/** }
+      - { path: /usr/lib/node_modules/@opencode/cli/bin/opencode.exe }
+      - { path: /usr/lib/node_modules/@opencode/** }
       - { path: /usr/local/bin/codex }
       - { path: /usr/bin/codex }
       - { path: /usr/lib/node_modules/@openai/** }

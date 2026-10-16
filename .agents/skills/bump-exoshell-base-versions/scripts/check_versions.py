@@ -18,7 +18,7 @@ CLAUDE_BASE = "https://storage.googleapis.com/claude-code-dist-86c565f3-f756-42a
 NPM = {
     "GWS_VERSION": "@googleworkspace/cli",
     "CODEX_VERSION": "@openai/codex",
-    "OPENCODE_VERSION": "opencode-ai",
+    "OPENCODE_VERSION": "@opencode/cli",
     "AST_GREP_VERSION": "@ast-grep/cli",
 }
 GITHUB = {
@@ -115,11 +115,13 @@ def npm_release(pin, lag, get=fetch):
     optional = entry.get("optionalDependencies", {})
     required = {
         "CODEX_VERSION": ("@openai/codex-linux-x64", "@openai/codex-linux-arm64"),
-        "OPENCODE_VERSION": ("opencode-linux-x64", "opencode-linux-arm64"),
+        "OPENCODE_VERSION": ("@opencode/cli-linux-x64", "@opencode/cli-linux-arm64"),
         "AST_GREP_VERSION": ("@ast-grep/cli-linux-x64-gnu", "@ast-grep/cli-linux-arm64-gnu"),
     }.get(pin, ())
     validate_assets(optional, required, candidate, date, url)
-    if pin == "OPENCODE_VERSION" and entry["bin"].get("opencode") != "bin/opencode.exe":
+    if pin == "OPENCODE_VERSION" and not (
+        entry["bin"].get("opencode") == entry["bin"].get("opencode2") == "bin/opencode.exe"
+    ):
         raise AssetError("OpenCode executable layout changed; inspect the policy and image paths", candidate, date, url)
     return candidate, date, url
 

@@ -117,7 +117,7 @@ model catalog or translate effort levels into a universal scale.
 
 [agents.opencode]
 # model = "openrouter/example-model"
-# effort = "high" # OpenCode: variant; requires model
+# effort = "high" # OpenCode: model variant (provider/model#variant); requires model
 ```
 
 Override a configured value for one launch with `--model VALUE` or
@@ -135,21 +135,25 @@ Explicit native options forwarded after `--` take precedence over ExOShell's
 starting values. Codex accepts repeatable `-c`/`--config` overrides for
 `model` and `model_reasoning_effort`; native `-m`/`--model` also overrides the
 model. Claude accepts native `--model` and `--effort`. OpenCode accepts native
-`-m`/`--model` and, for `run`, `--variant`. Values after a native literal `--`
+`-m`/`--model` for `run` and `mini` (the full-screen TUI accepts neither; use
+ExOShell model/effort settings for it). Values after a native literal `--`
 remain positional arguments. Verbose output reports ExOShell's selected
 values, not native overrides or the agent's eventual model selection.
 
-OpenCode effort requires an explicit model from the config, launcher option,
-or native model option. Interactive launches merge the pair into the built-in
-`build` and `plan` agents through disposable `OPENCODE_CONFIG_CONTENT`,
-preserving unrelated configuration and MCP settings. Custom OpenCode agents
-keep their own variant configuration. `opencode run` uses `--variant` instead.
-Users can change models and effort during the session.
+OpenCode effort requires an explicit model from the config or launcher option
+(native `--model` cannot combine with a configured effort for `run`; express
+the variant natively as `--model provider/model#variant`). Interactive launches
+merge the model (with `#variant` when effort is set) into the built-in `build`
+and `plan` agents through disposable `OPENCODE_CONFIG_CONTENT`, preserving
+unrelated configuration and MCP settings. Custom OpenCode agents keep their own
+model configuration. `opencode run` receives `--model` after the subcommand
+instead. Users can change models and effort during the session.
 
 Rebuild the base image and dependent images before using interactive OpenCode
-effort: its startup helper consumes the launcher's model/variant pair. Codex,
-Claude, and OpenCode model-only or `run` selections use native startup options.
-See [ADR-0036](adrs/adr0036-per-agent-model-and-effort-defaults.md).
+model/effort: its startup helper consumes the launcher's model/variant pair.
+Codex, Claude, and OpenCode `run` selections use native startup options.
+See [ADR-0036](adrs/adr0036-per-agent-model-and-effort-defaults.md) and
+[ADR-0040](adrs/adr0040-opencode-v2-migration.md).
 
 Use reserved example domains such as `github.example.com` and
 `gitlab.example.com` while preparing changes for publication. Never commit
@@ -227,9 +231,11 @@ ENTRYPOINT ["/bin/bash"]
 ```
 
 When replacing Codex or OpenCode defaults in a derived image, retain the
-disabled `atlassian` entry (`enabled = false` or `"enabled": false`). The base
-image's `exoshell-agent` helper enables it from the attached credential at
-startup, including when OpenCode uses a custom `OPENCODE_CONFIG` layer.
+disabled `atlassian` entry (`enabled = false` or `"disabled": true` under
+`mcp.servers`). The base image's `exoshell-agent` helper manages it from the
+attached credential at startup (installing the canonical server definition
+when the inline layer has none), including when OpenCode uses a custom
+`OPENCODE_CONFIG` layer.
 Keep Claude's inherited `CLAUDE_CONFIG_DIR` within a writable agent-state
 directory; its default is `/sandbox/.claude`.
 
@@ -556,7 +562,7 @@ binaries:
   - /usr/bin/claude
   - /usr/local/bin/opencode
   - /usr/bin/opencode
-  - /usr/lib/node_modules/opencode-ai/**
+  - /usr/lib/node_modules/@opencode/**
   - /usr/bin/curl
 ```
 
@@ -618,7 +624,7 @@ binaries:
   - /usr/bin/claude
   - /usr/local/bin/opencode
   - /usr/bin/opencode
-  - /usr/lib/node_modules/opencode-ai/**
+  - /usr/lib/node_modules/@opencode/**
   - /usr/bin/curl
 ```
 

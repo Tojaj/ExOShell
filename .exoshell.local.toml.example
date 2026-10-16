@@ -49,4 +49,4 @@ providers = ["exoshell-claude-code"]
 [agents.opencode]
 providers = ["exoshell-opencode-openrouter"]
 # model = "openrouter/example-model"
-# effort = "high" # OpenCode: variant; requires model
+# effort = "high" # OpenCode: model variant (provider/model#variant); requires model

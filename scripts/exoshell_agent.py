@@ -547,10 +547,12 @@ def native_option(arguments: Sequence[str], *names: str) -> str | None:
 
 
 def opencode_run_index(arguments: Sequence[str]) -> int | None:
-    """Locate run after native global options, without treating option values as commands."""
+    """Locate run after native value options, without treating option values as commands."""
     value_options = {
-        "--model", "-m", "--agent", "--log-level", "--port", "--hostname",
-        "--mdns-domain", "--cors", "--session", "-s", "--prompt", "--replay-limit",
+        "--server", "--session", "-s", "--prompt", "--model", "-m", "--agent",
+        "--format", "--file", "-f", "--title", "--dir", "--port", "--attach",
+        "--password", "-p", "--username", "-u", "--log-level", "--completions",
+        "--replay-limit",
     }
     index = 0
     while index < len(arguments):
@@ -585,25 +587,55 @@ def agent_command(settings: dict[str, Any], arguments: Sequence[str]) -> tuple[l
             if value is not None and native_option(arguments, f"--{key}") is None:
                 defaults.extend([f"--{key}", value])
     else:
-        if model is not None and native_model is None:
-            defaults.extend(["--model", model])
-        # The run command supports --variant; the TUI uses agent configuration.
+        # OpenCode v2: the TUI accepts no --model/--agent flags and `run` has
+        # no --variant; variants fuse into --model as provider/model#variant.
+        # Interactive defaults travel via EXOSHELL_OPENCODE_DEFAULTS into
+        # agents.build/agents.plan, while run defaults are --model flags
+        # placed after the subcommand (there is no global --model flag).
         run_index = opencode_run_index(arguments)
-        if effort is not None:
+        if run_index is not None:
+            if effort is not None:
+                effective_model = native_model if native_model is not None else model
+                if not effective_model:
+                    raise LauncherError(
+                        "OpenCode effort requires an explicit model; set agents.opencode.model "
+                        "or use --model provider/model#variant"
+                    )
+                if native_model is not None:
+                    # Fusing would require rewriting forwarded arguments.
+                    raise LauncherError(
+                        "OpenCode effort cannot combine with a native --model; "
+                        "use --model provider/model#variant instead"
+                    )
+                if "#" in effective_model:
+                    raise LauncherError(
+                        "OpenCode effort cannot combine with a model variant; "
+                        "use provider/model without #variant or drop the effort setting"
+                    )
+                return [
+                    "opencode", *arguments[:run_index + 1],
+                    "--model", f"{effective_model}#{effort}", *arguments[run_index + 1:],
+                ], environment_settings
+            if model is not None and native_model is None:
+                return [
+                    "opencode", *arguments[:run_index + 1],
+                    "--model", model, *arguments[run_index + 1:],
+                ], environment_settings
+        else:
             effective_model = native_model if native_model is not None else model
-            if not effective_model:
-                raise LauncherError(
-                    "OpenCode effort requires an explicit model; set agents.opencode.model or use --model"
-                )
-            if run_index is not None:
-                if native_option(arguments, "--variant") is None:
-                    # Run-only options must follow the subcommand.
-                    return [
-                        "opencode", *defaults, *arguments[:run_index + 1],
-                        "--variant", effort, *arguments[run_index + 1:],
-                    ], environment_settings
-            else:
+            if effort is not None:
+                if not effective_model:
+                    raise LauncherError(
+                        "OpenCode effort requires an explicit model; set agents.opencode.model"
+                    )
+                if "#" in effective_model:
+                    raise LauncherError(
+                        "OpenCode effort cannot combine with a model variant; "
+                        "use provider/model without #variant or drop the effort setting"
+                    )
                 environment_settings["opencode_defaults"] = {"model": effective_model, "variant": effort}
+            elif model is not None:
+                environment_settings["opencode_defaults"] = {"model": model}
     return [AGENTS[agent]["executable"], *defaults, *arguments], environment_settings
 
 

@@ -1,19 +1,21 @@
 {
   "$schema": "https://opencode.ai/config.json",
-  "autoupdate": false,
+  "update": "disable",
   "instructions": [
     "/etc/exoshell/instructions/openshell-sandbox.md",
     "/etc/exoshell/instructions/search-tools.md",
     "/etc/exoshell/instructions/selinux-bind-mount-labels.md"
   ],
   "mcp": {
-    "atlassian": {
-      "enabled": false,
-      "type": "remote",
-      "url": "https://mcp.atlassian.com/v2/mcp",
-      "oauth": false,
-      "headers": {
-        "Authorization": "Bearer {env:ATLASSIAN_MCP_BEARER_TOKEN}"
+    "servers": {
+      "atlassian": {
+        "type": "remote",
+        "url": "https://mcp.atlassian.com/v2/mcp",
+        "oauth": false,
+        "headers": {
+          "Authorization": "Bearer {env:ATLASSIAN_MCP_BEARER_TOKEN}"
+        },
+        "disabled": true
       }
     }
   }

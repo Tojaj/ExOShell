@@ -451,8 +451,11 @@ Smoke test by starting OpenCode with a known OpenRouter model:
 
 ```bash
 ./run-exoshell-agent.sh --agent opencode --provider exoshell-opencode-openrouter . -- \
-  --model openrouter/example
+  run --model openrouter/example 'reply with OK'
 ```
+
+(The v2 TUI accepts no `--model` flag; use `run --model` for non-interactive
+smoke tests. See [ADR-0040](adrs/adr0040-opencode-v2-migration.md).)
 
 ## OpenCode with OpenAI
 
@@ -693,7 +696,9 @@ exoshell-agent "$PWD" -- claude mcp list
 exoshell-agent "$PWD" -- opencode mcp list
 ```
 
-With a synchronized provider attached, confirm that Atlassian is enabled, then
+OpenCode v2 serves CLI requests from a per-user background server inside the
+sandbox; a first `mcp list` can report no servers while it is still starting,
+so query again before concluding a server is missing. With a synchronized provider attached, confirm that Atlassian is enabled, then
 make a read-only MCP request through the selected agent. Repeat without the
 provider: Codex and OpenCode should show it disabled; Claude should omit its
 image-provided entry. A project-defined Claude entry with the same name is

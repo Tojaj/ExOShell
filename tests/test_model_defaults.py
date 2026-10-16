@@ -101,27 +101,41 @@ class ModelDefaultsTests(unittest.TestCase):
                                   (["--model=native/model"], "native/model")):
             command, settings = self.command("opencode", arguments)
             self.assertEqual(settings["opencode_defaults"], {"model": wanted, "variant": "high"})
-            if arguments:
-                self.assertEqual(command[-len(arguments):], arguments)
+            # The v2 TUI accepts no --model flag; interactive defaults travel
+            # through configuration only.
+            self.assertEqual(command, ["opencode", *arguments])
         with self.assertRaisesRegex(launcher.LauncherError, "requires an explicit model"):
             self.command("opencode", [], model=None)
         command, settings = self.command("opencode", [], effort=None)
-        self.assertEqual(command, ["opencode", "--model", "example/model"])
-        self.assertNotIn("opencode_defaults", settings)
+        self.assertEqual(command, ["opencode"])
+        self.assertEqual(settings["opencode_defaults"], {"model": "example/model"})
 
-    def test_opencode_run_variant_follows_subcommand(self) -> None:
-        arguments = ["run", "--model", "native/model", "prompt"]
+    def test_opencode_run_model_follows_subcommand(self) -> None:
+        # `run` has no --variant in v2; effort fuses into --model after run.
+        arguments = ["run", "prompt"]
         command, settings = self.command("opencode", arguments)
-        self.assertEqual(command, ["opencode", "run", "--variant", "high", *arguments[1:]])
+        self.assertEqual(command, ["opencode", "run", "--model", "example/model#high", "prompt"])
         self.assertNotIn("opencode_defaults", settings)
-        arguments = ["run", "--variant=custom", "prompt"]
-        command, _ = self.command("opencode", arguments)
-        self.assertEqual(command, ["opencode", "--model", "example/model", *arguments])
+        command, settings = self.command("opencode", ["run", "prompt"], effort=None)
+        self.assertEqual(command, ["opencode", "run", "--model", "example/model", "prompt"])
+        self.assertNotIn("opencode_defaults", settings)
+        command, settings = self.command(
+            "opencode", ["run", "--model", "native/model", "prompt"], effort=None)
+        self.assertEqual(command, ["opencode", "run", "--model", "native/model", "prompt"])
+        self.assertNotIn("opencode_defaults", settings)
+        with self.assertRaisesRegex(launcher.LauncherError, "cannot combine with a native --model"):
+            self.command("opencode", ["run", "--model", "native/model", "prompt"])
+        with self.assertRaisesRegex(launcher.LauncherError, "cannot combine with a model variant"):
+            self.command("opencode", ["run", "prompt"], model="example/model#custom")
+        with self.assertRaisesRegex(launcher.LauncherError, "cannot combine with a model variant"):
+            self.command("opencode", [], model="example/model#custom")
+        with self.assertRaisesRegex(launcher.LauncherError, "requires an explicit model"):
+            self.command("opencode", ["run", "prompt"], model=None)
         arguments = ["--model", "native/model", "--pure", "run", "prompt"]
-        command, settings = self.command("opencode", arguments)
-        self.assertEqual(command, ["opencode", *arguments[:4], "--variant", "high", "prompt"])
-        self.assertNotIn("opencode_defaults", settings)
+        with self.assertRaisesRegex(launcher.LauncherError, "cannot combine with a native --model"):
+            self.command("opencode", arguments)
         command, settings = self.command("opencode", ["--prompt", "run"])
+        self.assertEqual(command, ["opencode", "--prompt", "run"])
         self.assertIn("opencode_defaults", settings)
 
     def test_opencode_error_precedes_external_commands_and_verbose_values(self) -> None:
@@ -167,7 +181,7 @@ class OpenCodeDefaultsStartupTests(unittest.TestCase):
                 if argument == "--env":
                     key, value = command[index + 1].split("=", 1)
                     environment[key] = value
-            environment["OPENCODE_CONFIG_CONTENT"] = '{"agent":{"custom":{"variant":"low"}}}'
+            environment["OPENCODE_CONFIG_CONTENT"] = '{"agents":{"custom":{"model":"other/model"}}}'
             separator = command.index("--")
             result = subprocess.run(
                 [str(ROOT / "sandboxes/exoshell-base/exoshell-agent"), *command[separator + 2:]],
@@ -175,17 +189,19 @@ class OpenCodeDefaultsStartupTests(unittest.TestCase):
             )
             self.assertEqual(result.returncode, 0, result.stderr)
             forwarded, config = json.loads(result.stdout)
-            self.assertEqual(forwarded, ["--model", "example/model", *arguments])
-            self.assertEqual(config["agent"]["plan"], {"model": "example/model", "variant": "high"})
-            self.assertEqual(config["agent"]["custom"], {"variant": "low"})
-            self.assertFalse(config["mcp"]["atlassian"]["enabled"])
+            self.assertEqual(forwarded, arguments)
+            self.assertEqual(config["agents"]["plan"], {"model": "example/model#high"})
+            self.assertEqual(config["agents"]["build"], {"model": "example/model#high"})
+            self.assertEqual(config["agents"]["custom"], {"model": "other/model"})
+            self.assertTrue(config["mcp"]["servers"]["atlassian"]["disabled"])
 
     def test_inline_merge_preserves_custom_agents_permissions_and_mcp(self) -> None:
         original = {
-            "instructions": ["/etc/example.md"], "agent": {
-                "build": {"permission": {"edit": "ask"}, "variant": "low"},
-                "custom": {"model": "other/model", "variant": "custom"},
-            }, "mcp": {"atlassian": {"timeout": 123}, "other": {"enabled": True}},
+            "instructions": ["/etc/example.md"], "agents": {
+                "build": {"permissions": [{"action": "edit", "resource": "*", "effect": "ask"}],
+                          "variant": "low"},
+                "custom": {"model": "other/model"},
+            }, "mcp": {"servers": {"atlassian": {"timeout": 123}, "other": {"disabled": False}}},
         }
         environment = {"OPENCODE_CONFIG_CONTENT": json.dumps(original),
                        "EXOSHELL_OPENCODE_DEFAULTS": json.dumps({"model": "example/model", "variant": "high"})}
@@ -193,10 +209,25 @@ class OpenCodeDefaultsStartupTests(unittest.TestCase):
         STARTUP["initialize_atlassian_mcp"](["opencode"], environment, Path("/workspace"))
         merged = json.loads(environment["OPENCODE_CONFIG_CONTENT"])
         self.assertEqual(merged["instructions"], original["instructions"])
-        self.assertEqual(merged["agent"]["custom"], original["agent"]["custom"])
-        self.assertEqual(merged["agent"]["build"], {"permission": {"edit": "ask"}, "model": "example/model", "variant": "high"})
-        self.assertEqual(merged["agent"]["plan"], {"model": "example/model", "variant": "high"})
-        self.assertEqual(merged["mcp"], {"atlassian": {"timeout": 123, "enabled": False}, "other": {"enabled": True}})
+        self.assertEqual(merged["agents"]["custom"], original["agents"]["custom"])
+        self.assertEqual(merged["agents"]["build"], {
+            "permissions": [{"action": "edit", "resource": "*", "effect": "ask"}],
+            "model": "example/model#high"})
+        self.assertEqual(merged["agents"]["plan"], {"model": "example/model#high"})
+        # An untyped inline server cannot connect, so the helper installs the
+        # canonical definition instead of preserving its stray fields.
+        self.assertEqual(merged["mcp"], {"servers": {
+            "atlassian": {**STARTUP["OPENCODE_ATLASSIAN_SERVER"], "disabled": True},
+            "other": {"disabled": False}}})
+        self.assertNotIn("EXOSHELL_OPENCODE_DEFAULTS", environment)
+
+    def test_model_only_defaults_merge_without_variant(self) -> None:
+        environment = {"OPENCODE_CONFIG_CONTENT": "{}",
+                       "EXOSHELL_OPENCODE_DEFAULTS": json.dumps({"model": "example/model"})}
+        STARTUP["initialize_opencode_defaults"](["opencode"], environment)
+        merged = json.loads(environment["OPENCODE_CONFIG_CONTENT"])
+        self.assertEqual(merged["agents"]["build"], {"model": "example/model"})
+        self.assertEqual(merged["agents"]["plan"], {"model": "example/model"})
         self.assertNotIn("EXOSHELL_OPENCODE_DEFAULTS", environment)
 
     def test_missing_defaults_and_other_agents_leave_config_alone(self) -> None:
@@ -210,8 +241,12 @@ class OpenCodeDefaultsStartupTests(unittest.TestCase):
     def test_invalid_defaults_and_inline_config_fail_cleanly(self) -> None:
         pair = json.dumps({"model": "example/model", "variant": "high"})
         for payload, content in (("invalid", "{}"), ("[]", "{}"), ("{}", "{}"),
-                                 (pair, "[]"), (pair, '{"agent": []}'),
-                                 (pair, '{"agent": {"build": []}}')):
+                                 (json.dumps({"variant": "high"}), "{}"),
+                                 (json.dumps({"model": "  "}), "{}"),
+                                 (json.dumps({"model": "example/model#high", "variant": "high"}), "{}"),
+                                 (json.dumps({"model": "example/model", "extra": True}), "{}"),
+                                 (pair, "[]"), (pair, '{"agents": []}'),
+                                 (pair, '{"agents": {"build": []}}')):
             with self.subTest(payload=payload, content=content), mock.patch("sys.stderr"):
                 with self.assertRaises(SystemExit) as error:
                     STARTUP["initialize_opencode_defaults"](["opencode"], {

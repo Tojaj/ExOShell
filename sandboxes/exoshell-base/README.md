@@ -102,10 +102,11 @@ image layers to add it to existing installations.
 
 Pinned tool version build arguments live in `Dockerfile`. Non-secret Codex
 defaults are copied to `/etc/codex/config.toml`; OpenCode automatic updates are
-disabled by global `/sandbox/.config/opencode/opencode.json` configuration.
+disabled by global `/sandbox/.config/opencode/opencode.json` configuration
+(`"update": "disable"`).
 Projects can override those OpenCode defaults with their own `opencode.json`.
-TUI settings are in `/sandbox/.config/opencode/tui.json`; projects can override
-them with their own `tui.json`.
+TUI settings are in `/sandbox/.config/opencode/cli.json`; there is no
+project-level TUI file.
 
 `exoshell-agent` prepares Codex authentication before starting the requested
 Codex command. With a non-empty `OPENAI_API_KEY`, it runs

@@ -77,8 +77,8 @@ binaries:
   - /usr/bin/claude
   - /usr/local/bin/opencode
   - /usr/bin/opencode
-  - /usr/lib/node_modules/opencode-ai/bin/opencode.exe
-  - /usr/lib/node_modules/opencode-ai/**
+  - /usr/lib/node_modules/@opencode/cli/bin/opencode.exe
+  - /usr/lib/node_modules/@opencode/**
   - /usr/local/bin/goose
   - /usr/bin/goose
   - /usr/local/bin/pi

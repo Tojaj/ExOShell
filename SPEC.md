@@ -128,12 +128,14 @@ model availability and effort-level compatibility to the selected agent.
 
 Codex receives TOML-quoted `model` and `model_reasoning_effort` CLI config
 overrides. Claude receives native `--model` and `--effort` options. OpenCode
-uses native model selection; effort requires an explicit effective model.
-Interactive OpenCode startup merges that pair into the built-in `build` and
+v2 uses `provider/model#variant` selection; effort requires an explicit
+effective model without its own `#variant`.
+Interactive OpenCode startup merges that selection into the built-in `build` and
 `plan` agent entries in `OPENCODE_CONFIG_CONTENT`, preserving unrelated
-configuration and MCP state. Custom agents retain their own variants.
-`opencode run` receives `--variant` instead. These are starting selections
-that users can change during a session. See ADR-0036 and CUSTOMIZATION.md.
+configuration and MCP state. Custom agents retain their own model
+configuration. `opencode run` receives `--model` after the subcommand instead
+(the TUI accepts no `--model` flag). These are starting selections
+that users can change during a session. See ADR-0036, ADR-0040, and CUSTOMIZATION.md.
 
 The CLI-only `-v` / `--verbose` flag reports the absolute selected configuration
 path before loading it, or identifies built-in defaults when no file is selected.

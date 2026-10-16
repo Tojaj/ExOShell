@@ -59,8 +59,8 @@ binaries:
   - /usr/local/bin/claude
   - /usr/bin/opencode
   - /usr/local/bin/opencode
-  - /usr/lib/node_modules/opencode-ai/bin/opencode.exe
-  - /usr/lib/node_modules/opencode-ai/**
+  - /usr/lib/node_modules/@opencode/cli/bin/opencode.exe
+  - /usr/lib/node_modules/@opencode/**
   - /usr/bin/curl
   - /usr/bin/oras
   - /usr/local/bin/oras
