@@ -1,0 +1,60 @@
+# Tavily web search and page extraction with a provider-backed API key.
+#
+# Tavily fetches upstream sources server-side and returns their content in
+# the API response, so the sandbox only ever talks to api.tavily.com and
+# needs no direct grant for the researched URLs. The agent reads the
+# TAVILY_API_KEY placeholder (the variable OpenCode websearch looks for);
+# OpenShell substitutes the real key only for the bound Tavily endpoint.
+# The key never enters the sandbox in readable form.
+#
+# Auth assumption: Bearer API key in the Authorization header. Confirm on
+# the gateway host before import; if Tavily instead expects the key in the
+# POST body, switch the credential to the request_body_credential_rewrite
+# pattern used by provider-gws-cli.yaml.
+#
+# Provider instance creation (one-time, on the host):
+#
+#   openshell provider profile lint -f provider-profiles/provider-tavily-search.yaml
+#   openshell provider profile import -f provider-profiles/provider-tavily-search.yaml
+#
+#   read -rsp "Tavily API key: " TAVILY_API_KEY
+#   printf '\n'
+#   export TAVILY_API_KEY
+#   openshell provider create --name exoshell-tavily-search \
+#     --type exoshell-tavily-search --from-existing
+#   unset TAVILY_API_KEY
+id: exoshell-tavily-search
+annotations:
+  exoshell-origin: ExOShell
+display_name: ExOShell Tavily search
+description: Web search and page extraction via the Tavily API using a Bearer API key
+category: knowledge
+credentials:
+  - name: api_key
+    description: Tavily API key
+    env_vars: [TAVILY_API_KEY]
+    required: true
+    auth_style: bearer
+    header_name: Authorization
+discovery:
+  credentials: [api_key]
+endpoints:
+  # Tavily's API is POST-based; scope each read operation to its exact path.
+  - host: api.tavily.com
+    port: 443
+    protocol: rest
+    enforcement: enforce
+    rules:
+      - allow: { method: POST, path: "/search" }
+      - allow: { method: POST, path: "/extract" }
+binaries:
+  - /usr/bin/codex
+  - /usr/local/bin/codex
+  - /usr/lib/node_modules/@openai/**
+  - /usr/bin/claude
+  - /usr/local/bin/claude
+  - /usr/bin/opencode
+  - /usr/local/bin/opencode
+  - /usr/lib/node_modules/opencode-ai/bin/opencode.exe
+  - /usr/lib/node_modules/opencode-ai/**
+  - /usr/bin/curl
