@@ -23,7 +23,7 @@ ARG TARGETARCH
 ARG GWS_VERSION=0.22.5
 ARG CODEX_VERSION=0.162.1
 ARG CLAUDE_VERSION=2.1.287
-ARG OPENCODE_VERSION=1.19.0
+ARG OPENCODE_VERSION=2.0.31
 ARG GLAB_VERSION=1.122.0
 ARG OC_VERSION=4.15.59
 ARG ORAS_VERSION=1.3.4
@@ -62,10 +62,15 @@ RUN npm install -g "@googleworkspace/cli@${GWS_VERSION}" \
 RUN npm install -g "@openai/codex@${CODEX_VERSION}" \
     && npm cache clean --force
 
-# Overlay newer OpenCode on the same npm layout as community `base`.
+# Overlay OpenCode v2 on the same npm layout as community `base`.
 # Policy matches PATH shims and the npm tree (native ELF is
-# opencode-ai/bin/opencode.exe; older releases used bin/.opencode).
-RUN npm install -g "opencode-ai@${OPENCODE_VERSION}" \
+# @opencode/cli/bin/opencode.exe, hardlinked from the platform
+# @opencode/cli-linux-<arch> package by the postinstall script; npm also
+# creates an opencode2 shim for the same executable).
+# The v1 package must be removed first: both packages provide an `opencode`
+# bin and npm refuses to overwrite another package's file (EEXIST).
+RUN if npm ls -g --depth=0 opencode-ai >/dev/null 2>&1; then npm rm -g opencode-ai; fi \
+    && npm install -g "@opencode/cli@${OPENCODE_VERSION}" \
     && npm cache clean --force \
     && oc_bin="$(command -v opencode)" \
     && [ -n "$oc_bin" ] \
@@ -173,7 +178,7 @@ RUN touch /etc/exoshell/skills-import-v1
 # Global defaults keep the image-pinned OpenCode version from updating while
 # allowing project configuration to override them.
 COPY --chown=sandbox:sandbox --chmod=0644 opencode.json /sandbox/.config/opencode/opencode.json
-COPY --chown=sandbox:sandbox --chmod=0644 tui.json /sandbox/.config/opencode/tui.json
+COPY --chown=sandbox:sandbox --chmod=0644 cli.json /sandbox/.config/opencode/cli.json
 # Keep Claude's mutable user configuration within the writable agent directory.
 # Atlassian is registered by exoshell-agent only with a provider credential.
 ENV CLAUDE_CONFIG_DIR=/sandbox/.claude

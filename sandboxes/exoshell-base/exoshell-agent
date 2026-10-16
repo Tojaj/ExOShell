@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Start a command in a project, initializing provider-backed integrations."""
 
+import copy
 import json
 import os
 from pathlib import Path
@@ -16,6 +17,12 @@ GWS_KEYS = ("GWS_CLIENT_ID", "GWS_CLIENT_SECRET", "GWS_REFRESH_TOKEN")
 ATLASSIAN_KEY = "ATLASSIAN_MCP_BEARER_TOKEN"
 CLAUDE_MCP_TEMPLATE = Path("/etc/exoshell/claude-atlassian.json")
 SKILLS_DIR = Path("/sandbox/.agents/skills")
+OPENCODE_ATLASSIAN_SERVER = {
+    "type": "remote",
+    "url": "https://mcp.atlassian.com/v2/mcp",
+    "oauth": False,
+    "headers": {"Authorization": "Bearer {env:ATLASSIAN_MCP_BEARER_TOKEN}"},
+}
 
 
 def fail(message: str) -> None:
@@ -139,9 +146,16 @@ def initialize_atlassian_mcp(command: list[str], environment: dict[str, str], pr
             fail("OPENCODE_CONFIG_CONTENT must be a JSON object")
         if not isinstance(config, dict):
             fail("OPENCODE_CONFIG_CONTENT must be a JSON object")
-        servers = object_field(config, "mcp")
+        servers = object_field(object_field(config, "mcp"), "servers")
         server = object_field(servers, "atlassian")
-        server["enabled"] = enabled
+        if not isinstance(server.get("type"), str) or not server["type"]:
+            # A higher-precedence layer replaces the whole server object, so a
+            # partial entry would discard the image definition. Install the
+            # canonical definition and preserve a complete custom one.
+            server.clear()
+            server.update(copy.deepcopy(OPENCODE_ATLASSIAN_SERVER))
+        server.pop("enabled", None)
+        server["disabled"] = not enabled
         environment["OPENCODE_CONFIG_CONTENT"] = json.dumps(config)
     elif agent == "claude":
         initialize_claude_mcp(environment, project, enabled)
@@ -149,21 +163,29 @@ def initialize_atlassian_mcp(command: list[str], environment: dict[str, str], pr
 
 
 def initialize_opencode_defaults(command: list[str], environment: dict[str, str]) -> None:
-    """Merge interactive model/variant defaults into disposable inline config."""
+    """Merge interactive model defaults into disposable inline config."""
     defaults_text = environment.pop("EXOSHELL_OPENCODE_DEFAULTS", None)
     if Path(command[0]).name != "opencode" or defaults_text is None:
         return
     try:
         defaults = json.loads(defaults_text)
-        if (not isinstance(defaults, dict) or set(defaults) != {"model", "variant"}
-                or any(not isinstance(value, str) or not value.strip() for value in defaults.values())):
-            fail("EXOSHELL_OPENCODE_DEFAULTS must contain non-empty model and variant strings")
+        if (not isinstance(defaults, dict) or set(defaults) - {"model", "variant"}
+                or not isinstance(defaults.get("model"), str) or not defaults["model"].strip()):
+            fail("EXOSHELL_OPENCODE_DEFAULTS must contain a non-empty model string")
+        variant = defaults.get("variant")
+        if variant is not None and (not isinstance(variant, str) or not variant.strip()):
+            fail("EXOSHELL_OPENCODE_DEFAULTS variant must be a non-empty string")
+        if variant is not None and "#" in defaults["model"]:
+            fail("EXOSHELL_OPENCODE_DEFAULTS model must not already contain a variant")
+        selected = defaults["model"] if variant is None else f"{defaults['model']}#{variant}"
         config = json.loads(environment.get("OPENCODE_CONFIG_CONTENT") or "{}")
         if not isinstance(config, dict):
             fail("OPENCODE_CONFIG_CONTENT must be a JSON object")
-        agents = object_field(config, "agent")
+        agents = object_field(config, "agents")
         for name in ("build", "plan"):
-            object_field(agents, name).update(defaults)
+            entry = object_field(agents, name)
+            entry.pop("variant", None)
+            entry["model"] = selected
         environment["OPENCODE_CONFIG_CONTENT"] = json.dumps(config)
     except (ValueError, TypeError):
         fail("could not prepare OpenCode model defaults")

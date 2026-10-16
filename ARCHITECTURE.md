@@ -72,7 +72,10 @@ Agent state remains in the sandbox container layer and is discarded when the
 default `--no-keep` lifecycle removes the sandbox. `--keep` deliberately
 retains that state for debugging. Codex uses image-owned configuration at
 `/etc/codex`; OpenCode uses an image-provided global configuration from
-`/sandbox/.config/opencode`, which project configuration can override. Optional
+`/sandbox/.config/opencode` (`opencode.json`, plus TUI `cli.json`), which
+project configuration can override. The v2 CLI may also run a per-user
+background server; it lives in the same container layer and shares this
+lifecycle. Optional
 kubeconfig mounting is independent of agent selection. The launcher always
 mounts `/tmp/gws` as tmpfs, including for providers attached later. The image
 executable creates the private GWS credentials file and config directory when
