@@ -168,6 +168,11 @@ filesystem grants. Import and create only the providers needed for a session;
 providers.md documents the supported profiles. Avoid attaching profiles with
 conflicting credential environment variables.
 
+The baseline `opencode.ai` endpoint permits opaque placeholders in conversation
+bodies with `allow_uninspected_credentials`, matching the OpenCode inference
+provider profiles. Body credential rewriting stays disabled; the model catalog
+and other baseline endpoints retain body scanning. See ADR-0041.
+
 Supplied profile IDs start with `exoshell-` and carry the `exoshell-origin:
 ExOShell` annotation. Suggested instance names drop a trailing `-cli`; registry
 profiles and suggested instances use `-ro` for consumption without publishing.

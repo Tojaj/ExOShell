@@ -425,6 +425,29 @@ Smoke test:
   -p 'reply with OK'
 ```
 
+## OpenCode built-in inference
+
+Models served through `opencode.ai`, including free models in OpenCode's model
+picker, use the baseline policy's `opencode_site` endpoint rather than the
+OpenAI, Anthropic, or OpenRouter profiles below. That endpoint sets
+`allow_uninspected_credentials: true` so conversation history can contain opaque
+provider placeholders without resolving them into real credentials. Body
+credential rewriting remains disabled. See
+[ADR-0041](adrs/adr0041-opencode-site-opaque-conversation-placeholders.md).
+
+If OpenCode reports "A credential placeholder in the request body cannot be
+forwarded" for `opencode.ai`, update the `opencode_site` endpoint in your selected
+policy to match [`policies/policy.yaml`](policies/policy.yaml). This also applies
+to custom policies copied from an older baseline. Recreate the sandbox or apply
+the network-only update using the workflow in
+[`CUSTOMIZATION.md`](CUSTOMIZATION.md#iterate-and-verify); no image rebuild or
+provider profile update is needed.
+
+To smoke-test, select an available model served by `opencode.ai`, send a prompt
+containing a synthetic string such as `openshell:resolve:env:example_TOKEN`, and
+send a follow-up. Both requests should reach inference without the body
+credential denial. Never use a real credential for this test.
+
 ## OpenCode with OpenRouter
 
 `exoshell-opencode-openrouter` supplies an OpenRouter API key to OpenCode. It is the

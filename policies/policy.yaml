@@ -60,10 +60,17 @@ network_policies:
       - { path: /usr/lib/node_modules/@opencode/** }
 
   # OpenCode's site also serves account and inference requests, which may POST.
+  # Forward conversation placeholders unchanged, never as resolved credentials.
+  # Keep request_body_credential_rewrite disabled (ADR-0041, extending ADR-0008).
   opencode_site:
     name: opencode-site-audit
     endpoints:
-      - { host: opencode.ai, port: 443, protocol: rest, enforcement: audit, access: full }
+      - host: opencode.ai
+        port: 443
+        protocol: rest
+        enforcement: audit
+        access: full
+        allow_uninspected_credentials: true
     binaries:
       - { path: /usr/bin/opencode }
       - { path: /usr/local/bin/opencode }
