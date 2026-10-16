@@ -737,6 +737,15 @@ researched URLs. The sandbox receives the `TAVILY_API_KEY` placeholder — the
 variable OpenCode websearch looks for — and OpenShell substitutes the real key
 only for the bound Tavily endpoint.
 
+For OpenCode, `exoshell-agent` selects `websearch.provider = "tavily"` when
+`TAVILY_API_KEY` is non-empty, skipping the provider-selection prompt. This
+uses disposable `OPENCODE_CONFIG_CONTENT`, not a project file, and never copies
+the key into configuration. An explicit provider or `websearch: false` in that
+inline layer is preserved; otherwise this selection overrides file-based search
+settings. Without the key, search configuration is unchanged. Bare `opencode`
+commands bypass this initialization. Rebuild the base and dependent images to
+enable it.
+
 ```bash
 openshell provider profile lint -f provider-profiles/provider-tavily-search.yaml
 openshell provider profile import -f provider-profiles/provider-tavily-search.yaml
