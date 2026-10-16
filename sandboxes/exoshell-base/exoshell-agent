@@ -191,6 +191,25 @@ def initialize_opencode_defaults(command: list[str], environment: dict[str, str]
         fail("could not prepare OpenCode model defaults")
 
 
+def initialize_opencode_websearch(command: list[str], environment: dict[str, str]) -> None:
+    """Select attached Tavily without copying its credential into configuration."""
+    if Path(command[0]).name != "opencode" or not environment.get("TAVILY_API_KEY"):
+        return
+    try:
+        config = json.loads(environment.get("OPENCODE_CONFIG_CONTENT") or "{}")
+    except (ValueError, TypeError):
+        fail("OPENCODE_CONFIG_CONTENT must be a JSON object")
+    if not isinstance(config, dict):
+        fail("OPENCODE_CONFIG_CONTENT must be a JSON object")
+    search = config.setdefault("websearch", {})
+    if search is False:
+        return
+    if not isinstance(search, dict):
+        fail("OpenCode websearch configuration must be an object or false")
+    search.setdefault("provider", "tavily")
+    environment["OPENCODE_CONFIG_CONTENT"] = json.dumps(config)
+
+
 def initialize_gws(environment: dict[str, str], directory: Path = GWS_DIR) -> None:
     """Initialize from provider credentials; a partial environment is an error."""
     if not any(environment.get(key) for key in GWS_KEYS):
@@ -253,6 +272,7 @@ def main(arguments: list[str]) -> None:
     environment = os.environ.copy()
     initialize_skills(environment)
     initialize_opencode_defaults(arguments[2:], environment)
+    initialize_opencode_websearch(arguments[2:], environment)
     command = initialize_atlassian_mcp(arguments[2:], environment, project)
     initialize_gws(environment)
     initialize_codex_auth(command, environment, project)

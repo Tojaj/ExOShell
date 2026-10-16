@@ -7,6 +7,7 @@ import os
 from pathlib import Path
 import runpy
 import shutil
+import socket
 import subprocess
 import tempfile
 import threading
@@ -154,6 +155,7 @@ class AtlassianStartupTests(unittest.TestCase):
             executable.chmod(0o755)
             environment = os.environ.copy()
             environment.pop(KEY, None)
+            environment.pop("TAVILY_API_KEY", None)
             for key in ("GWS_CLIENT_ID", "GWS_CLIENT_SECRET", "GWS_REFRESH_TOKEN"):
                 environment.pop(key, None)
             environment.pop("OPENCODE_CONFIG_CONTENT", None)
@@ -289,6 +291,14 @@ class InstalledClientTests(unittest.TestCase):
             environment = {**os.environ, "OPENCODE_CONFIG": str(IMAGE / "opencode.json")}
             for key in ("XDG_CONFIG_HOME", "XDG_DATA_HOME", "XDG_CACHE_HOME", "XDG_STATE_HOME"):
                 environment[key] = str(directory / key)
+            # XDG directories isolate service state, but not the default port.
+            # Leave any existing user service alone and use a free test port.
+            with socket.socket() as listener:
+                listener.bind(("127.0.0.1", 0))
+                port = listener.getsockname()[1]
+            configured = subprocess.run(["opencode", "service", "set", "port", str(port)],
+                                        env=environment, capture_output=True, timeout=30)
+            self.assertEqual(configured.returncode, 0, "OpenCode could not configure test service port")
             for enabled in (False, True):
                 environment.pop(KEY, None)
                 if enabled:
@@ -298,10 +308,12 @@ class InstalledClientTests(unittest.TestCase):
                         **STARTUP["OPENCODE_ATLASSIAN_SERVER"], "disabled": not enabled}}},
                 })
                 stop_service(environment)
-                command = INITIALIZE(["opencode", "debug", "config"], environment, directory)
-                result = subprocess.run(command, env=environment, cwd=directory,
-                                        capture_output=True, text=True, timeout=60)
-                stop_service(environment)
+                try:
+                    command = INITIALIZE(["opencode", "debug", "config"], environment, directory)
+                    result = subprocess.run(command, env=environment, cwd=directory,
+                                            capture_output=True, text=True, timeout=60)
+                finally:
+                    stop_service(environment)
                 self.assertEqual(result.returncode, 0, "OpenCode could not load runtime configuration")
                 documents = [document.get("info", {}) for document in json.loads(result.stdout)
                              if document.get("type") == "document" and "path" not in document]

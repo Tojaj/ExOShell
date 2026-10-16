@@ -188,6 +188,15 @@ selected baseline. PyYAML is required by `policy-overlays/apply.py`.
 
 ## 5. Optional integrations and lifecycle
 
+For OpenCode, the image helper selects Tavily web search when `TAVILY_API_KEY`
+is non-empty. It merges `websearch.provider = "tavily"` into disposable
+`OPENCODE_CONFIG_CONTENT`, preserving unrelated settings, explicit inline
+provider selections, and inline `websearch: false`. This startup layer overrides
+file-based search settings but writes no project configuration or credential
+value. Without the key, search configuration is unchanged. Bare OpenCode
+commands bypass initialization; provider changes require a fresh process
+environment and another helper invocation.
+
 Before starting Codex, the image helper runs `codex login --with-api-key`
 when `OPENAI_API_KEY` is non-empty, supplying the current provider placeholder
 through stdin. Each helper invocation refreshes the saved login; failure stops

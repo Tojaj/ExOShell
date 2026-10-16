@@ -108,6 +108,14 @@ Projects can override those OpenCode defaults with their own `opencode.json`.
 TUI settings are in `/sandbox/.config/opencode/cli.json`; there is no
 project-level TUI file.
 
+For OpenCode launches through `exoshell-agent`, a non-empty `TAVILY_API_KEY`
+selects Tavily web search through disposable `OPENCODE_CONFIG_CONTENT`, without
+writing a project file or serializing the credential. Explicit inline provider
+selection or `websearch: false` is preserved; otherwise the startup selection
+overrides file-based search settings. Without the key, search settings are
+unchanged. Rebuild the base and dependent images to enable this behavior.
+See [Tavily setup](../../providers.md#tavily-web-search).
+
 `exoshell-agent` prepares Codex authentication before starting the requested
 Codex command. With a non-empty `OPENAI_API_KEY`, it runs
 `codex login --with-api-key` and supplies the attached provider's placeholder
