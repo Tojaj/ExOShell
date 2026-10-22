@@ -60,8 +60,8 @@ network_policies:
       - { path: /usr/lib/node_modules/@opencode/** }
 
   # OpenCode's site also serves account and inference requests, which may POST.
-  # Forward conversation placeholders unchanged, never as resolved credentials.
-  # Keep request_body_credential_rewrite disabled (ADR-0041, extending ADR-0008).
+  # Native body classification forwards valid placeholders without resolving them.
+  # Keep request_body_credential_rewrite disabled (ADR-0042).
   opencode_site:
     name: opencode-site-audit
     endpoints:
@@ -70,7 +70,6 @@ network_policies:
         protocol: rest
         enforcement: audit
         access: full
-        allow_uninspected_credentials: true
     binaries:
       - { path: /usr/bin/opencode }
       - { path: /usr/local/bin/opencode }

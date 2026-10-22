@@ -1,5 +1,6 @@
 ---
-status: accepted
+status: superseded
+superseded-by: adr0042-native-inference-body-classification.md
 date: 2026-09-14
 author: Tomas Mlcoch
 topics:
@@ -9,6 +10,8 @@ topics:
 ---
 
 # 8. Custom Codex provider profile with `allow_uninspected_credentials` on conversation endpoints
+
+Superseded by [the native OpenShell decision](adr0042-native-inference-body-classification.md).
 
 ## Context
 

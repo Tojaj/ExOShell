@@ -214,8 +214,10 @@ calling it elsewhere, pass `--config /path/to/checkout/.exoshell.local.toml`
 or move the config to the user directory. Adjust relative TOML paths when
 moving the file.
 
-Policy-overlay users must supply the correct `--base-file` explicitly;
-launcher discovery does not select the overlay helper's baseline.
+The launcher records the selected policy path in the sandbox annotation
+`exoshell.policy-source-file`. Overlay `--revert` uses this source unless
+`--base-file` overrides it. Sandboxes without that annotation require
+`--base-file`; the helper does not guess from launcher configuration.
 
 For configuration debugging, pass `-v` or `--verbose`:
 
@@ -316,8 +318,9 @@ and `opencode.json` files survive under `/workspace`.
 
 ### Host OpenShell configuration
 
-Configure the OpenShell gateway on the host before using the launcher. For
-OpenShell 0.1.0, the relevant settings in
+OpenShell **v0.1.5 or newer** is required. When upgrading, follow the
+[v0.1.5 migration guide](docs/upgrade-openshell-0.1.5.md). Configure the
+OpenShell gateway on the host before using the launcher. The relevant settings in
 `~/.config/openshell/gateway.toml` are:
 
 ```toml
@@ -340,7 +343,7 @@ enabled = false
 ```
 
 The launcher supplies Podman bind mounts through `--driver-config-json` to
-expose the selected host project below `/workspace`. OpenShell 0.1.0 disables
+expose the selected host project below `/workspace`. OpenShell disables
 caller-supplied driver config by default, and raw host binds are rejected while
 resource admission is enabled. This setup opts into driver config and disables
 resource admission for the selected Podman driver; only use it on a gateway

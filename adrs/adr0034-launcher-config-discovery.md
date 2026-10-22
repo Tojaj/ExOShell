@@ -32,7 +32,9 @@ Invalid, unreadable, and non-file candidates will fail rather than fall
 through. CLI overrides, provider composition, and config-relative paths will
 retain their existing behavior. We will omit launcher-directory, positional
 project, parent-directory, uppercase-alias, and `XDG_CONFIG_DIRS` searches.
-We will leave policy-overlay baseline discovery unchanged.
+We originally left policy-overlay baseline discovery unchanged.
+[ADR-0044](adr0044-sandbox-policy-source-annotations.md) later replaced that
+helper fallback with per-sandbox source annotations and explicit overrides.
 
 ## Consequences
 
@@ -41,8 +43,9 @@ We will leave policy-overlay baseline discovery unchanged.
 - Checkout configs remain discoverable when running from that checkout.
   Callers elsewhere must pass `--config` or move the file to the user directory
   and adjust relative paths.
-- Overlay users must supply the correct `--base-file` explicitly; launcher
-  discovery does not determine that helper's baseline.
+- Under ADR-0044, overlay revert uses the selected sandbox's recorded policy
+  source. An explicit `--base-file` overrides it and is required when the source
+  metadata or file is unavailable.
 
 ## References
 

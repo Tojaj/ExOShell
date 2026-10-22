@@ -384,9 +384,11 @@ openshell provider create --name exoshell-codex \
   --type exoshell-codex-cli --credential OPENAI_API_KEY
 ```
 
-The custom profile is required because the built-in Codex profile injects
-`CODEX_AUTH_*` credentials and cannot enable the required
-`allow_uninspected_credentials` behavior. See [ADR 8](adrs/adr0008-custom-codex-provider-allow-uninspected-credentials.md).
+The custom profile supplies `OPENAI_API_KEY`; the built-in Codex profile uses
+`CODEX_AUTH_*` authentication instead. OpenShell's native classifier forwards
+valid conversation placeholders without resolving their secret values. Body
+rewriting and `allow_uninspected_credentials` remain disabled. See
+[ADR-0042](adrs/adr0042-native-inference-body-classification.md).
 
 Smoke test by launching Codex with the provider and asking it to complete a
 small request:
@@ -399,7 +401,8 @@ small request:
 
 `exoshell-claude-code-cli` supplies an Anthropic API key to Claude Code. Inference
 request bodies can contain opaque placeholders from other providers, so the
-profile preserves those placeholders until the appropriate request is made.
+native body classifier forwards valid placeholders unchanged. Only the
+authentication header resolves the API key; inference body rewriting stays disabled.
 
 Do not attach it with `exoshell-opencode-anthropic`: both export `ANTHROPIC_API_KEY`.
 Subscription OAuth is not supported because it requires sandbox-readable
@@ -429,19 +432,17 @@ Smoke test:
 
 Models served through `opencode.ai`, including free models in OpenCode's model
 picker, use the baseline policy's `opencode_site` endpoint rather than the
-OpenAI, Anthropic, or OpenRouter profiles below. That endpoint sets
-`allow_uninspected_credentials: true` so conversation history can contain opaque
-provider placeholders without resolving them into real credentials. Body
-credential rewriting remains disabled. See
-[ADR-0041](adrs/adr0041-opencode-site-opaque-conversation-placeholders.md).
+OpenAI, Anthropic, or OpenRouter profiles below. It uses OpenShell's native body
+classifier, as do the inference provider profiles. Valid issued placeholders
+and unknown literals pass as opaque text; invalid, revoked, or expired references
+can be denied. Body credential rewriting stays disabled. See
+[ADR-0042](adrs/adr0042-native-inference-body-classification.md).
 
 If OpenCode reports "A credential placeholder in the request body cannot be
-forwarded" for `opencode.ai`, update the `opencode_site` endpoint in your selected
-policy to match [`policies/policy.yaml`](policies/policy.yaml). This also applies
-to custom policies copied from an older baseline. Recreate the sandbox or apply
-the network-only update using the workflow in
-[`CUSTOMIZATION.md`](CUSTOMIZATION.md#iterate-and-verify); no image rebuild or
-provider profile update is needed.
+forwarded", check that the CLI, gateway, and supervisor versions match and the
+referenced provider is still valid. Recreate the session after provider changes
+if it retains stale placeholders. Do not restore the broad scanning exception
+or enable body credential rewriting to bypass the error.
 
 To smoke-test, select an available model served by `opencode.ai`, send a prompt
 containing a synthetic string such as `openshell:resolve:env:example_TOKEN`, and

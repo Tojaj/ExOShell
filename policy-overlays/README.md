@@ -42,7 +42,7 @@ the authority for endpoint-overlap, metadata, and ambiguity validation.
 # Combine independent capabilities.
 ./policy-overlays/apply.py --sandbox <sandbox-name> github-issues-prs.yaml github-push.yaml
 
-# Restore the configured baseline and remove every active overlay.
+# Restore this sandbox's recorded baseline and remove every active overlay.
 ./policy-overlays/apply.py --sandbox <sandbox-name> --revert
 
 # Start from the baseline, then enable exactly the named capability.
@@ -56,12 +56,27 @@ Bare names are looked up in `policy-overlays/`; the `.yaml` suffix is optional.
 A path containing `/` or beginning with `.` is used as-is. Applying the same
 overlay again is idempotent because it replaces the same entry.
 
-`--revert` reads `network_policies` from `--base-file`. Without that option,
-the helper still uses the policy in its checkout's `.exoshell.local.toml`,
-or `policies/policy.yaml` when no local policy is configured. Launcher config
-discovery does not determine this baseline: supply the correct `--base-file`
-explicitly, especially when using a caller-directory or user config. Its diff
-always compares the original live state with the final composed state.
+`--revert` reads `network_policies` from explicit `--base-file` first, or otherwise
+from the sandbox annotation `exoshell.policy-source-file`. ExOShell records the
+resolved absolute policy path when creating a sandbox with a selected policy.
+This works from any working directory and with downstream policies. It reads
+the file's current contents, not a creation-time snapshot. Its diff always
+compares the original live state with the final composed state.
+
+Sandboxes created before this feature, direct OpenShell launches without the
+annotation, and ExOShell `--no-policy` launches require an explicit baseline:
+
+```bash
+./policy-overlays/apply.py --sandbox <sandbox-name> --revert --base-file ./policies/policy.yaml
+```
+
+Missing, malformed, unreadable, or unavailable recorded sources fail with an
+instruction to supply `--base-file`; the helper never guesses from launcher
+configuration or its own checkout. Use an explicit baseline after moving the
+source file or when managing the sandbox from another host. Relative explicit
+paths resolve from the caller's directory. Ordinary overlay application and
+explicit baselines do not request sandbox metadata. OpenShell v0.1.5 or newer
+is required. See [ADR-0044](../adrs/adr0044-sandbox-policy-source-annotations.md).
 
 ## GitHub overlays
 

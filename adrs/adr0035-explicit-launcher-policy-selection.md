@@ -41,6 +41,10 @@ will be deferred.
 - Explicit delegation can still encounter OpenShell activation failures.
 - Policy selection does not require image changes or a rebuild.
 
+Policy-source recording was added in
+[ADR-0044](adr0044-sandbox-policy-source-annotations.md). It does not change
+this explicit-selection requirement; `--no-policy` omits source metadata.
+
 ## References
 
 - [OpenShell default policy](https://docs.nvidia.com/openshell/how-it-works/policies/default-policy)

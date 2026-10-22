@@ -90,10 +90,11 @@ exclusively through composable policy overlays applied at runtime via
 Each external service or write category will have its own overlay file. Overlays
 are designed to be combined (`apply.py --sandbox NAME github-issues-prs.yaml
 github-push.yaml`) and reverted (`apply.py --sandbox NAME --revert`) without
-sandbox recreation. The baseline is the implicit revert target: `apply.py
---sandbox NAME --revert` restores the policy selected in
-`.exoshell.local.toml` (or `policy.yaml` when none is configured), including its
-`network_policies` verbatim.
+sandbox recreation. Baseline selection was amended by
+[ADR-0044](adr0044-sandbox-policy-source-annotations.md): `apply.py --sandbox NAME
+--revert` reads the sandbox's recorded policy source, unless `--base-file`
+overrides it. Missing or unavailable sources require an explicit baseline.
+Reversion restores its `network_policies` while retaining live static sections.
 
 New external write capabilities (GitLab, Jira, etc.) will follow this pattern:
 read-only in the baseline, write overlay in `policy-overlays/`, documented in

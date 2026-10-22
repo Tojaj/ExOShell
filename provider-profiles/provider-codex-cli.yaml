@@ -1,10 +1,8 @@
 # Custom Codex profile for API-key auth (not ChatGPT OAuth).
 #
-# Built-in `codex` injects CODEX_AUTH_* and cannot set this flag.
-# Codex POSTs conversation text to api.openai.com; that JSON often includes
-# other providers' placeholders (e.g. `gh auth status`). Body rewrite would
-# send the real GitHub token to OpenAI. allow_uninspected_credentials forwards
-# the opaque placeholder instead. Header rewrite for OPENAI_API_KEY is unchanged.
+# Built-in `codex` injects CODEX_AUTH_*; this profile supplies OPENAI_API_KEY.
+# OpenShell classifies conversation placeholders without resolving body text.
+# Keep body rewriting disabled; authentication headers still resolve the key.
 id: exoshell-codex-cli
 annotations:
   exoshell-origin: ExOShell
@@ -27,7 +25,6 @@ endpoints:
     protocol: rest
     access: read-write
     enforcement: enforce
-    allow_uninspected_credentials: true
   - host: auth.openai.com
     port: 443
     protocol: rest
@@ -38,13 +35,11 @@ endpoints:
     protocol: rest
     access: read-write
     enforcement: enforce
-    allow_uninspected_credentials: true
   - host: ab.chatgpt.com
     port: 443
     protocol: rest
     access: read-write
     enforcement: enforce
-    allow_uninspected_credentials: true
 binaries:
   - /usr/bin/codex
   - /usr/local/bin/codex

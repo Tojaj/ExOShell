@@ -15,7 +15,7 @@ class InferencePolicyTests(unittest.TestCase):
             (ROOT / "policies/policy.yaml").read_text()
         )["network_policies"]
 
-    def test_opencode_site_forwards_opaque_placeholders_without_body_rewrite(self) -> None:
+    def test_opencode_site_uses_native_body_classification(self) -> None:
         site = self.network["opencode_site"]
         self.assertEqual(site["endpoints"], [{
             "host": "opencode.ai",
@@ -23,7 +23,6 @@ class InferencePolicyTests(unittest.TestCase):
             "protocol": "rest",
             "enforcement": "audit",
             "access": "full",
-            "allow_uninspected_credentials": True,
         }])
         self.assertEqual(site["binaries"], self.network["opencode_model_catalog"]["binaries"])
         self.assertIn(
@@ -31,23 +30,22 @@ class InferencePolicyTests(unittest.TestCase):
             site["binaries"],
         )
 
-    def test_body_scanning_exception_does_not_extend_to_other_baseline_hosts(self) -> None:
+    def test_baseline_keeps_body_classification_and_disables_body_rewrite(self) -> None:
         for name, policy in self.network.items():
-            if name == "opencode_site":
-                continue
             for endpoint in policy["endpoints"]:
                 with self.subTest(policy=name, host=endpoint["host"]):
                     self.assertFalse(endpoint.get("allow_uninspected_credentials", False))
                     self.assertFalse(endpoint.get("request_body_credential_rewrite", False))
 
-    def test_other_opencode_inference_backends_keep_opaque_placeholders(self) -> None:
-        for backend in ("openai", "anthropic", "openrouter"):
-            with self.subTest(backend=backend):
+    def test_inference_profiles_use_native_classification_without_body_rewrite(self) -> None:
+        for name in ("codex-cli", "claude-code-cli", "opencode-openai",
+                     "opencode-anthropic", "opencode-openrouter"):
+            with self.subTest(profile=name):
                 profile = yaml.safe_load(
-                    (ROOT / f"provider-profiles/provider-opencode-{backend}.yaml").read_text()
+                    (ROOT / f"provider-profiles/provider-{name}.yaml").read_text()
                 )
                 for endpoint in profile["endpoints"]:
-                    self.assertIs(endpoint.get("allow_uninspected_credentials"), True)
+                    self.assertFalse(endpoint.get("allow_uninspected_credentials", False))
                     self.assertFalse(endpoint.get("request_body_credential_rewrite", False))
 
 

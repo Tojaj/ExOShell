@@ -26,8 +26,9 @@ The Podman gateway must enable bind mounts and caller-supplied driver config.
 The documented setup disables resource admission and uses `userns = "keep-id"`;
 operators must trust gateway users to select host paths. See README.md and
 ADR-0025. Private trust roots and extra client defaults belong in derived images.
-On OpenShell 0.1.2, inspected egress uses a separate supervisor container;
-CUSTOMIZATION.md and ADR-0026 document its trust configuration.
+OpenShell v0.1.5 or newer is required. Inspected egress uses a separate
+supervisor container; private CA trust uses the Podman driver's
+`additional_ca_bundle`. CUSTOMIZATION.md and ADR-0043 document its configuration.
 
 Shared operational guidance lives in the base image's `agent-instructions/`
 and is installed under `/etc/exoshell/instructions/`. The build combines the
@@ -115,8 +116,9 @@ CLI provider options replace the combined list. Discovery does not search the
 launcher directory, positional project, parents, uppercase aliases, or
 `XDG_CONFIG_DIRS`. A checkout config is still discovered when called from
 that checkout; callers elsewhere must use `--config` or move it to the user
-directory. Overlay users must supply the correct `--base-file` explicitly;
-launcher discovery does not determine the helper's baseline. See ADR-0034.
+directory. The launcher records an explicitly selected policy's resolved absolute
+path in `exoshell.policy-source-file` sandbox metadata; `--no-policy` omits it.
+See ADR-0034 and ADR-0044.
 
 Each agent table also accepts optional non-empty `model` and `effort` strings.
 Only the selected agent's values apply; omitted fields retain native defaults.
@@ -168,10 +170,11 @@ filesystem grants. Import and create only the providers needed for a session;
 providers.md documents the supported profiles. Avoid attaching profiles with
 conflicting credential environment variables.
 
-The baseline `opencode.ai` endpoint permits opaque placeholders in conversation
-bodies with `allow_uninspected_credentials`, matching the OpenCode inference
-provider profiles. Body credential rewriting stays disabled; the model catalog
-and other baseline endpoints retain body scanning. See ADR-0041.
+Inference profiles and the baseline `opencode.ai` endpoint use OpenShell's
+native body classification. Unknown literals and valid issued placeholders are
+forwarded unchanged; invalid or unavailable references can be denied. The
+`allow_uninspected_credentials` exception is absent and inference body rewriting
+stays disabled. GWS token endpoints retain intentional body rewriting. See ADR-0042.
 
 Supplied profile IDs start with `exoshell-` and carry the `exoshell-origin:
 ExOShell` annotation. Suggested instance names drop a trailing `-cli`; registry
@@ -183,8 +186,14 @@ GitHub and GitLab GraphQL endpoints are declared once per host in user policy,
 allowing network overlays to replace an entry when enabling writes. Provider
 profiles retain credential bindings and REST/Git transport rules. Overlay
 composition replaces each named network policy entry in full and preserves
-live static policy sections. Reversion restores network entries from the
-selected baseline. PyYAML is required by `policy-overlays/apply.py`.
+live static policy sections. Reversion restores network entries from an explicit
+`--base-file`, or otherwise the sandbox's `exoshell.policy-source-file`
+annotation. Missing, malformed,
+unreadable, or unavailable sources require an explicit baseline; no checkout
+configuration or public-policy fallback is used. The source's current contents
+are read, not a creation-time snapshot. Normal overlay application and explicit
+baselines do not fetch sandbox metadata. See ADR-0044. PyYAML is required by
+`policy-overlays/apply.py`.
 
 ## 5. Optional integrations and lifecycle
 

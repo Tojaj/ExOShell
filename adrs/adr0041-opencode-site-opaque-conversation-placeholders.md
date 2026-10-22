@@ -1,5 +1,6 @@
 ---
-status: accepted
+status: superseded
+superseded-by: adr0042-native-inference-body-classification.md
 date: 2026-10-16
 topics:
   - opencode
@@ -8,6 +9,8 @@ topics:
 ---
 
 # 41. Forward opaque conversation placeholders to OpenCode's inference host
+
+Superseded by [the native OpenShell decision](adr0042-native-inference-body-classification.md).
 
 ## Context
 

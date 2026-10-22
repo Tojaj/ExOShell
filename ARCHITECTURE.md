@@ -58,9 +58,10 @@ when a retained sandbox is needed for debugging.
 Policies control filesystem, process, and network access. Provider profiles
 bind placeholder credentials to selected binaries and inference endpoints.
 Auxiliary agent traffic is auditable in policy, while inference endpoints are
-enforced by provider profiles. Profiles allow unresolved placeholders in
-inference bodies because conversations and tool output may contain opaque
-placeholders belonging to other attached providers.
+enforced by provider profiles. OpenShell classifies inference body placeholders
+without resolving them, including valid references from the same or another
+provider. The profiles keep body rewriting disabled and retain native scanning
+for invalid or unavailable references. See ADR-0042.
 
 Provider profiles are backend-specific, not launcher-specific. OpenCode stays
 backend-neutral: the chosen model/config determines whether its OpenAI,

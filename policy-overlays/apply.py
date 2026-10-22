@@ -34,7 +34,6 @@ import os
 import subprocess
 import sys
 import tempfile
-import tomllib
 from pathlib import Path
 from typing import Any
 
@@ -45,8 +44,7 @@ except ImportError:  # pragma: no cover
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 OVERLAY_DIR = REPO_ROOT / "policy-overlays"
-PUBLIC_BASE_FILE = REPO_ROOT / "policies" / "policy.yaml"
-LOCAL_CONFIG_FILE = REPO_ROOT / ".exoshell.local.toml"
+POLICY_SOURCE_ANNOTATION = "exoshell.policy-source-file"
 
 
 class PolicyError(ValueError):
@@ -80,24 +78,6 @@ StrictLoader.add_constructor(
     yaml.resolver.BaseResolver.DEFAULT_MAPPING_TAG,
     construct_mapping,
 )
-
-
-def default_base_file(config_path: Path = LOCAL_CONFIG_FILE) -> Path:
-    """Return the local launcher policy, or the portable public baseline."""
-    if not config_path.is_file():
-        return PUBLIC_BASE_FILE
-    try:
-        with config_path.open("rb") as stream:
-            config = tomllib.load(stream)
-    except (OSError, tomllib.TOMLDecodeError) as error:
-        raise PolicyError(f"cannot load launcher configuration {config_path}: {error}") from error
-    policy = config.get("policy")
-    if policy is None:
-        return PUBLIC_BASE_FILE
-    if not isinstance(policy, str) or not policy:
-        raise PolicyError(f"configuration key 'policy' must be a non-empty string: {config_path}")
-    path = Path(policy).expanduser()
-    return (path if path.is_absolute() else config_path.parent / path).resolve(strict=False)
 
 
 # ---------------------------------------------------------------------------
@@ -285,6 +265,43 @@ def get_live_policy(sandbox: str) -> dict[str, Any]:
     return policy
 
 
+def revert_base_file(sandbox: str, explicit: str | None) -> Path:
+    """Use an explicit baseline or the source recorded by the sandbox launcher."""
+    if explicit is not None:
+        return Path(explicit).expanduser()
+    result = subprocess.run(
+        ["openshell", "sandbox", "get", sandbox, "-o", "json"],
+        capture_output=True,
+        text=True,
+    )
+    if result.returncode != 0:
+        raise PolicyError(
+            f"cannot read sandbox policy-source metadata: {result.stderr.strip()}; "
+            "supply --base-file PATH"
+        )
+    try:
+        annotations = json.loads(result.stdout)["annotations"]
+        source = annotations[POLICY_SOURCE_ANNOTATION]
+    except (json.JSONDecodeError, KeyError, TypeError) as error:
+        raise PolicyError(
+            "sandbox has no valid policy-source metadata; supply --base-file PATH"
+        ) from error
+    if not isinstance(source, str) or not source or "\0" in source:
+        raise PolicyError("invalid policy-source annotation; supply --base-file PATH")
+    path = Path(source)
+    if not path.is_absolute():
+        raise PolicyError("policy-source annotation must be absolute; supply --base-file PATH")
+    try:
+        available = path.is_file()
+    except OSError as error:
+        raise PolicyError(
+            f"cannot access recorded policy source {path}: {error}; supply --base-file PATH"
+        ) from error
+    if not available:
+        raise PolicyError(f"recorded policy source is unavailable: {path}; supply --base-file PATH")
+    return path
+
+
 def apply_policy(policy: dict[str, Any], sandbox: str, *, wait: bool, timeout: int) -> None:
     """Write the policy temporarily and hand it to the OpenShell CLI."""
     temporary = tempfile.NamedTemporaryFile(suffix=".yaml", mode="w", delete=False, encoding="utf-8")
@@ -304,8 +321,8 @@ def apply_policy(policy: dict[str, Any], sandbox: str, *, wait: bool, timeout: i
             pass
 
 
-def parser(base_file: Path) -> argparse.ArgumentParser:
-    """Build the command-line parser after resolving the default baseline."""
+def parser() -> argparse.ArgumentParser:
+    """Build the command-line parser without consulting launcher configuration."""
     argument_parser = argparse.ArgumentParser(
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
     )
@@ -314,8 +331,7 @@ def parser(base_file: Path) -> argparse.ArgumentParser:
     argument_parser.add_argument(
         "-b",
         "--base-file",
-        default=str(base_file),
-        help=f"Base policy file for --revert (default: {base_file})",
+        help="base policy file for --revert (default: sandbox policy-source annotation)",
     )
     argument_parser.add_argument("--revert", action="store_true")
     argument_parser.add_argument("-n", "--dry-run", action="store_true")
@@ -327,14 +343,18 @@ def parser(base_file: Path) -> argparse.ArgumentParser:
 
 def main() -> None:
     try:
-        args = parser(default_base_file()).parse_args()
+        args = parser().parse_args()
         print(f"Fetching live base policy for sandbox '{args.sandbox}' ...", file=sys.stderr)
         live_policy = get_live_policy(args.sandbox)
         live_network = validate_network_policies(live_policy, "live policy", overlay=False)
 
         if args.revert:
-            composed_base = load_base_network_policies(Path(args.base_file))
-            print(f"--revert: starting from network_policies in '{args.base_file}'", file=sys.stderr)
+            base_file = revert_base_file(args.sandbox, args.base_file)
+            try:
+                composed_base = load_base_network_policies(base_file)
+            except PolicyError as error:
+                raise PolicyError(f"{error}; supply --base-file PATH to select another baseline") from error
+            print(f"--revert: starting from network_policies in '{base_file}'", file=sys.stderr)
         else:
             composed_base = live_network
 

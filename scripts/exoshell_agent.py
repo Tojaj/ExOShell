@@ -656,6 +656,7 @@ def create_command(
         command.extend(["--provider", provider])
     if settings["policy"] is not None:
         command.extend(["--policy", str(settings["policy"])])
+        command.extend(["--annotation", f"exoshell.policy-source-file={settings['policy']}"])
     selected_command, environment_settings = agent_command(settings, agent_args)
     command.extend(environment_args(environment_settings, name, email))
     if settings.get("skills_snapshot") is not None:

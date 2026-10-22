@@ -92,7 +92,7 @@ The main extension points are:
 | Need | Extension point |
 |---|---|
 | Additional CLIs, workload CA certificates, or managed agent defaults | Derived sandbox image |
-| Private CA for inspected Podman HTTPS egress | Derived supervisor image and gateway `supervisor_image` |
+| Private CA for inspected Podman HTTPS egress | Gateway host PEM file and Podman `additional_ca_bundle` |
 | Filesystem and network access | Sandbox policy |
 | Credential injection and provider-owned endpoint access | Provider profile and provider instance |
 | Machine paths, selected image, policy, providers, and starting model/effort | `.exoshell.local.toml` |
@@ -179,12 +179,16 @@ current customization repository:
 
 TOML file paths resolve relative to that file, so `policy =
 "policies/policy-local.yaml"` can stay within the customization repository.
-The overlay helper's automatic baseline lookup still uses its own checkout's
-local configuration. Overlay users must supply the correct `--base-file`
-explicitly; launcher discovery does not determine the helper's baseline.
-Build the generic image from the selected checkout, then the custom workload
-and optional supervisor, and finally use the upstream local-user build script
-with `--base-image` and `--tag` to select the custom ownership layer.
+The overlay helper uses the sandbox's recorded policy source for `--revert`.
+Supply `--base-file` to override it or for an unannotated sandbox. The annotation
+is an absolute path on the launching host, so another host needs its own
+explicit baseline. It records provenance, not a copy of the file.
+
+For image builds, build the public base first, then the organization-specific
+workload, and finally use the upstream local-user build script to remap identity.
+Configure private supervisor trust through the gateway's `additional_ca_bundle`;
+no custom supervisor image is needed. Record the reviewed public revision only
+after downstream compatibility checks pass.
 
 See [ADR-0027](adrs/adr0027-separate-customization-repository.md).
 
@@ -314,58 +318,33 @@ rather than technical enforcement.
 
 ### Private CA for inspected Podman HTTPS egress
 
-On OpenShell 0.1.2, Podman runs the network supervisor in a separate container.
-The `organization-ca.crt` installed in `example-base` lets workload clients
-verify private-CA services, but it does not let the supervisor verify inspected
-upstream HTTPS connections. Build a matching supervisor image with the same CA
-bundle:
-
-```text
-sandboxes/example-supervisor/
-`-- Dockerfile
-```
-
-```dockerfile
-# syntax=docker/dockerfile:1
-ARG CA_IMAGE=localhost/example-base:latest
-ARG SUPERVISOR_IMAGE=ghcr.io/nvidia/openshell/supervisor:0.1.2
-
-FROM ${CA_IMAGE} AS ca-source
-FROM ${SUPERVISOR_IMAGE}
-
-COPY --from=ca-source /etc/ssl/certs/ca-certificates.crt \
-    /etc/ssl/certs/ca-certificates.crt
-```
-
-Set `SUPERVISOR_IMAGE` to the official supervisor image matching your installed
-OpenShell release, either in the Dockerfile or with `--build-arg`. The copied
-bundle replaces the supervisor image's system bundle, so keep the public roots
-your deployment needs in `example-base`.
-Build this image after `example-base`:
-
-```bash
-podman build -t example-supervisor sandboxes/example-supervisor
-```
-
-In the gateway host's `~/.config/openshell/gateway.toml`, add this setting to
-the existing `[openshell.drivers.podman]` table:
+OpenShell v0.1.5 supports private CA trust in the stock Podman supervisor.
+Place an operator-owned PEM bundle at an absolute, gateway-readable path on the
+**gateway host**, then add this setting to the existing
+`[openshell.drivers.podman]` table in `~/.config/openshell/gateway.toml`:
 
 ```toml
-supervisor_image = "localhost/example-supervisor:latest"
+additional_ca_bundle = "/etc/openshell/tls/additional-ca.pem"
 ```
 
-Restart the gateway and create a fresh sandbox. For a remote gateway, push the
-supervisor image to a registry it can access and use its fully qualified image
-reference. This gateway setting gives every Podman sandbox's supervisor the
-extra trust anchors; each sandbox's network policy still controls its allowed
-destinations. Rebuild the supervisor image when OpenShell is upgraded or the
-private CA changes.
+The file must contain at least one valid certificate. OpenShell validates it
+when the driver starts; unreadable or certificate-free bundles prevent gateway
+startup. The setting works with direct egress and does not require `https_proxy`.
+It augments the stock supervisor's public roots and the workload's injected
+trust bundle. It applies to every Podman sandbox and destination on the gateway;
+network policy still controls access.
 
-In OpenShell 0.1.2, Podman's `proxy_ca_bundle` requires `https_proxy`, so it does
-not serve direct egress. See
-[ADR-0026](adrs/adr0026-custom-podman-supervisor-ca-bundle.md) and
-[upstream issue #3781](https://github.com/NVIDIA/OpenShell/issues/3781) for the
-reason this separate image is needed and the upstream fix request.
+Remove a `supervisor_image` override previously used only to add private roots.
+The default supervisor image follows the installed OpenShell version. Restart
+the gateway and create fresh sandboxes after changing the setting or CA bundle.
+For remote gateways, install the PEM on the remote gateway host.
+
+Derived workload images can still install their own roots for build-time
+requests and clients that use the image's trust store. Keep private certificate
+sources and host paths in the customization repository or machine-local setup.
+See [ADR-0043](adrs/adr0043-native-podman-additional-ca-bundle.md) and the
+[upgrade guide](docs/upgrade-openshell-0.1.5.md). `proxy_ca_bundle` remains the
+separate option for corporate forward proxies.
 
 ### Image requirements
 

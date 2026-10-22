@@ -21,7 +21,6 @@ endpoints:
     protocol: rest
     access: read-write
     enforcement: enforce
-    allow_uninspected_credentials: true
 binaries:
   - /usr/bin/claude
   - /usr/local/bin/claude

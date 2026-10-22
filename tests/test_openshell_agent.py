@@ -147,7 +147,7 @@ class DiscoveryTests(unittest.TestCase):
                     )
 
     def test_valid_policy_paths_resolve_relative_to_source_and_follow_symlinks(self) -> None:
-        cli_policy = self.cwd / "policy with spaces.yaml"
+        cli_policy = self.cwd / "policy with spaces=baseline.yaml"
         cli_policy.write_text("network_policies: {}\n")
         configured_policy = self.user.parent / cli_policy.name
         configured_policy.write_text("network_policies: {}\n")
@@ -159,9 +159,13 @@ class DiscoveryTests(unittest.TestCase):
             with self.subTest(relative=relative):
                 command = self.command("--policy", relative)
                 self.assertEqual(command[command.index("--policy") + 1], str(cli_policy))
+                self.assertEqual(command[command.index("--annotation") + 1],
+                                 f"exoshell.policy-source-file={cli_policy}")
                 self.user.write_text(f'policy = "{relative}"\n')
                 command = self.command("--config", str(self.user))
                 self.assertEqual(command[command.index("--policy") + 1], str(configured_policy))
+                self.assertEqual(command[command.index("--annotation") + 1],
+                                 f"exoshell.policy-source-file={configured_policy}")
 
     def test_cli_policy_override_and_opt_out_ignore_invalid_configured_path(self) -> None:
         self.local.write_text('policy = "missing.yaml"\n')
@@ -169,7 +173,10 @@ class DiscoveryTests(unittest.TestCase):
         replacement.write_text("network_policies: {}\n")
         command = self.command("--policy", replacement.name)
         self.assertEqual(command[command.index("--policy") + 1], str(replacement))
+        self.assertEqual(command[command.index("--annotation") + 1],
+                         f"exoshell.policy-source-file={replacement}")
         self.assertNotIn("--policy", self.command("--no-policy"))
+        self.assertNotIn("--annotation", self.command("--no-policy"))
         self.local.unlink()
         self.assertNotIn("--policy", self.command("--no-policy"))
 
@@ -632,18 +639,6 @@ class OverlayBasePolicyTests(unittest.TestCase):
             with self.assertRaises(SystemExit) as error:
                 policy_apply.main()
         self.assertEqual(error.exception.code, 2)
-
-    def test_missing_local_config_uses_public_policy(self) -> None:
-        with tempfile.TemporaryDirectory() as temporary:
-            config_path = Path(temporary) / "missing.toml"
-            self.assertEqual(policy_apply.default_base_file(config_path), policy_apply.PUBLIC_BASE_FILE)
-
-    def test_local_config_policy_is_resolved_relative_to_config(self) -> None:
-        with tempfile.TemporaryDirectory() as temporary:
-            root = Path(temporary)
-            config_path = root / ".exoshell.local.toml"
-            config_path.write_text('policy = "policies/local.yaml"\n')
-            self.assertEqual(policy_apply.default_base_file(config_path), root / "policies/local.yaml")
 
 
 class CommandTests(unittest.TestCase):

@@ -1,5 +1,6 @@
 ---
-status: accepted
+status: superseded
+superseded-by: adr0043-native-podman-additional-ca-bundle.md
 date: 2026-09-28
 topics:
   - podman
@@ -8,6 +9,8 @@ topics:
 ---
 
 # 26. Supply private upstream CA trust through a custom Podman supervisor image
+
+Superseded by [the native OpenShell decision](adr0043-native-podman-additional-ca-bundle.md).
 
 ## Context
 
