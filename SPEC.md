@@ -19,7 +19,11 @@ endpoints enforce their credential and request boundaries.
 
 The generic workload image extends the OpenShell community base with pinned
 agent CLIs and supporting tools. A machine-local ownership layer remaps its
-`sandbox` user to the host UID/GID. No host-specific numeric identity is committed.
+`sandbox` user to the host UID/GID by default. The local-user build accepts
+`--uid UID` and `--gid GID` independently to select explicit image IDs.
+Explicit IDs require matching gateway
+`userns = "keep-id:uid=<UID>,gid=<GID>"`; bare `keep-id` preserves host IDs.
+No host-specific numeric identity is committed. See ADR-0045.
 `build.sh` builds both layers regardless of the caller's working directory.
 
 The Podman gateway must enable bind mounts and caller-supplied driver config.

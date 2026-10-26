@@ -42,6 +42,12 @@ We will not switch to `keep-id:uid=<image-uid>` until that mapping is verified
 to give writable shares without a local image for the supported OpenShell and
 Podman versions.
 
+Identity selection was amended by
+[ADR-0045](adr0045-explicit-local-image-identity.md): the local-user build
+accepts explicit `--uid`/`--gid`, paired with a matching gateway
+`keep-id:uid=...,gid=...`, for host IDs outside the rootless mapping. The
+local identity layer remains.
+
 ## Consequences
 
 - Every machine still builds `sandboxes/local-user` with `id -u` / `id -g`.

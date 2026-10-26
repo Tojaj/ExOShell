@@ -267,8 +267,10 @@ podman build -t example-base sandboxes/example-base
 ```
 
 The final local layer remaps the image's `sandbox` account to the current host
-UID and GID. This is required for writable rootless-Podman bind mounts and keeps
-personal numeric IDs out of shared Dockerfiles.
+UID and GID by default, keeping personal IDs out of shared Dockerfiles. If those
+IDs are unavailable in the rootless namespace, select explicit IDs with a
+matching gateway `keep-id` mapping as described in the
+[local-user guide](sandboxes/local-user/README.md).
 
 Select the resulting image in the ignored local configuration:
 
