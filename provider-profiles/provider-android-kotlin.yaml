@@ -1,0 +1,89 @@
+# Anonymous Gradle/Maven/Google-Android read-only consumption for Kotlin Android
+# app development. Gradle resolves through Java, so OpenShell matches the
+# resolved java executable and its ancestors, not the gradlew wrapper in argv.
+# Network grant only: the ExOShell base image does not install Java, Gradle,
+# Kotlin, or the Android SDK. Install them in a derived image and check their
+# kernel-resolved paths against the binaries list below (for example,
+# `readlink -f "$(command -v java)"`) before import.
+id: exoshell-android-kotlin-ro
+annotations:
+  exoshell-origin: ExOShell
+display_name: ExOShell Android Kotlin (read-only)
+description: Gradle distributions and plugins, Maven Central and Google Android artifacts, and Android SDK downloads, without publishing
+category: data
+endpoints:
+  # Gradle Plugin Portal (gradlePluginPortal()) and Gradle distribution and
+  # version metadata (services.gradle.org/distributions/).
+  - host: plugins.gradle.org
+    port: 443
+    protocol: rest
+    access: read-only
+    enforcement: enforce
+  - host: services.gradle.org
+    port: 443
+    protocol: rest
+    access: read-only
+    enforcement: enforce
+  # Maven Central (mavenCentral()). repo.maven.apache.org is Gradle's default
+  # repository URL; repo1.maven.org serves the same backend and is hit by
+  # Maven tooling, POM redirects, and some IDE integrations.
+  - host: repo.maven.apache.org
+    port: 443
+    protocol: rest
+    access: read-only
+    enforcement: enforce
+  - host: repo1.maven.org
+    port: 443
+    protocol: rest
+    access: read-only
+    enforcement: enforce
+  # Google's Android artifact repository (Google()): AndroidX, Compose,
+  # Play services, and the Kotlin Gradle plugin artifacts mirrored there.
+  - host: maven.google.com
+    port: 443
+    protocol: rest
+    access: read-only
+    enforcement: enforce
+  # Android SDK packages (cmdline-tools, platform-tools, platforms,
+  # build-tools) and the repository manifests under /android/repository/.
+  # A path selector takes precedence over the baseline's Google audit wildcard
+  # and avoids an equal-specificity conflict with exoshell-go-modules-ro,
+  # which owns dl.google.com/go/**.
+  - host: dl.google.com
+    port: 443
+    path: /android/**
+    protocol: rest
+    access: read-only
+    enforcement: enforce
+binaries:
+  # Gradle runs on Java; the wrapper script resolves to java.
+  - /usr/lib/jvm/**/bin/java
+  - /usr/bin/java
+  - /usr/local/bin/java
+  - /opt/gradle/**/bin/gradle
+  - /usr/local/bin/gradle
+  - /usr/bin/gradle
+  - /sandbox/.sdkman/candidates/gradle/**/bin/gradle
+  # Kotlin compiler, when installed standalone rather than via Gradle.
+  - /opt/kotlin/**/bin/kotlinc
+  - /usr/local/bin/kotlinc
+  - /usr/bin/kotlinc
+  - /sandbox/.sdkman/candidates/kotlin/**/bin/kotlinc
+  # Android SDK command-line tools; these are launcher scripts that resolve
+  # to java, which is also listed above.
+  - /opt/android-sdk/cmdline-tools/**/bin/sdkmanager
+  - /opt/android-sdk/cmdline-tools/**/bin/avdmanager
+  - /opt/android-sdk/platform-tools/adb
+  - /sandbox/Android/Sdk/cmdline-tools/**/bin/sdkmanager
+  - /sandbox/Android/Sdk/cmdline-tools/**/bin/avdmanager
+  - /sandbox/Android/Sdk/platform-tools/adb
+  - /usr/bin/codex
+  - /usr/local/bin/codex
+  - /usr/lib/node_modules/@openai/**
+  - /usr/bin/claude
+  - /usr/local/bin/claude
+  - /usr/bin/opencode
+  - /usr/local/bin/opencode
+  - /usr/lib/node_modules/@opencode/cli/bin/opencode.exe
+  - /usr/lib/node_modules/@opencode/**
+  - /usr/bin/curl

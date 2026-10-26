@@ -36,7 +36,7 @@ read-only. `-publish` is reserved for future publishing profiles.
 
 ## Opt-in package registries
 
-Eight independent, credential-free profiles grant package or container image
+Nine independent, credential-free profiles grant package or container image
 downloads and metadata lookups over HTTPS. Ubuntu APT also supports HTTP for
 stock source configurations. None is attached by default or grants publishing
 access:
@@ -51,8 +51,9 @@ access:
 | `exoshell-ghcr-registry-ro` | `ghcr.io`, `pkg-containers.githubusercontent.com` | Public OCI image and artifact reads by agents, `curl`, `oras`, `skopeo`, and Python tools |
 | `exoshell-dockerhub-registry-ro` | `registry-1.docker.io`, `auth.docker.io`, `production.cloudfront.docker.com`, `docker-images-prod.6aa30f8b08e16409b46e0173d6de2f56.r2.cloudflarestorage.com` | Public OCI image and artifact reads by agents, `curl`, `oras`, `skopeo`, and Python tools |
 | `exoshell-quay-registry-ro` | `quay.io`, `cdn.quay.io`, `cdn01.quay.io` through `cdn06.quay.io` | Public OCI image and artifact reads by agents, `curl`, `oras`, `skopeo`, and Python tools |
+| `exoshell-android-kotlin-ro` | `plugins.gradle.org`, `services.gradle.org`, `repo.maven.apache.org`, `repo1.maven.org`, `maven.google.com`, `dl.google.com` (`/android/**`) | Gradle distributions and plugins, Maven Central and Google Android artifacts, Android SDK downloads for Kotlin Android development |
 
-All eight allow GET/HEAD/OPTIONS; npm alone also allows POST to
+All nine allow GET/HEAD/OPTIONS; npm alone also allows POST to
 `/-/npm/v1/security/advisories/bulk` and `/-/npm/v1/security/audits/quick`.
 Publishing, login, and unrelated POST/PUT/PATCH/DELETE requests are not granted.
 
@@ -76,6 +77,7 @@ For PyPI, Go, Cargo, and GHCR, select the file and ID independently:
 | `provider-go-modules.yaml` | `exoshell-go-modules-ro` |
 | `provider-cargo-crates.yaml` | `exoshell-cargo-crates-ro` |
 | `provider-ghcr-registry.yaml` | `exoshell-ghcr-registry-ro` |
+| `provider-android-kotlin.yaml` | `exoshell-android-kotlin-ro` |
 
 Lint/import the selected file, then create with `--name <instance> --type <id>`.
 For the two additional container registries:
@@ -301,9 +303,68 @@ public counterpart only if no other layer grants it. To avoid Go's default
 direct-VCS fallback, set `GOPROXY=https://proxy.golang.org` (without `,direct`)
 and review `GOPRIVATE`/`GOSUMDB` for the modules in use. Git dependencies and
 runtime installers beyond the Node and Go paths above are not covered.
-Maven/Gradle, NuGet, RubyGems, and
+NuGet, RubyGems, and
 Composer can have separate profiles later. See
 [ADR 24](adrs/adr0024-opt-in-package-registry-providers.md).
+
+### Android Kotlin details
+
+```bash
+openshell provider profile lint -f provider-profiles/provider-android-kotlin.yaml
+openshell provider profile import -f provider-profiles/provider-android-kotlin.yaml
+openshell provider create --name exoshell-android-kotlin-ro --type exoshell-android-kotlin-ro
+```
+
+Attach the instance alongside the agent's inference provider:
+
+```bash
+./run-exoshell-agent.sh --agent codex \
+  --provider exoshell-codex --provider exoshell-android-kotlin-ro \
+  . -- exec 'reply with OK'
+```
+
+CLI provider options replace the configured list; include any other instances
+needed for that launch. For repeat use, add `exoshell-android-kotlin-ro` to the common
+`providers` array in `.exoshell.local.toml`.
+
+The profile covers the Gradle Plugin Portal (`plugins.gradle.org`), Gradle
+distributions and version metadata (`services.gradle.org`), Maven Central
+(`repo.maven.apache.org`, plus `repo1.maven.org` for Maven tooling and POM
+redirects), Google's Android artifact repository (`maven.google.com`), and
+Android SDK packages and repository manifests (`dl.google.com` under
+`/android/**`). These paths include dependency metadata, jars/aars, Gradle
+distributions, and SDK archives. Gradle uses GET; no upload or authentication
+endpoints are needed. Dependency coordinates use ordinary slashes, so
+`allow_encoded_slash` remains disabled. The `dl.google.com` path selector takes
+precedence over the baseline's Google audit wildcard and avoids an
+equal-specificity conflict with `exoshell-go-modules-ro`, which owns
+`dl.google.com/go/**`. Kotlin plugin and library artifacts resolve through
+Maven Central, the Gradle Plugin Portal, and Google Maven, so no separate
+JetBrains host is included; snapshot or KMP development builds that need one
+require a separately reviewed endpoint. JCenter is sunset and not covered.
+Attaching this provider does not configure Gradle repositories; declare
+`google()`, `mavenCentral()`, and `gradlePluginPortal()` in project settings
+as usual.
+
+The binary list includes `java`, `gradle`, `kotlinc`, the Android SDK
+`sdkmanager`/`avdmanager`/`adb`, all three agents and `curl`. A read smoke test
+after attaching is:
+
+```bash
+curl --fail --silent --show-error --output /tmp/google-master-index.xml \
+  https://maven.google.com/master-index.xml
+curl --fail --silent --show-error --output /tmp/android-repository.xml \
+  https://dl.google.com/android/repository/repository2-1.xml
+```
+
+This grants network access only. The baseline policy keeps `/usr`, `/etc` and
+other system paths read-only, and the sandbox runs as `sandbox`. The base image
+does not install Java, Gradle, Kotlin, or the Android SDK: install them in a
+derived image, point `ANDROID_SDK_ROOT`/`ANDROID_HOME` and `GRADLE_USER_HOME`
+at writable sandbox paths, and verify each tool's kernel-resolved path with
+`readlink -f "$(command -v <tool>)"` against the profile `binaries` list
+before import. Gradle resolves through Java, so the `java` entries cover
+`gradlew` wrapper launches as well.
 
 ## Provider lifecycle
 
