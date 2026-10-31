@@ -10,7 +10,7 @@ OpenShell community image
  sandboxes/exoshell-base    pinned tools and non-secret defaults
           │
           ▼
- sandboxes/local-user       host UID/GID compatibility
+ sandboxes/local-user       host (or explicit) UID/GID compatibility
           │
           ▼
  run-exoshell-agent.sh ──► scripts/exoshell_agent.py
@@ -27,9 +27,10 @@ OpenShell community image
 
 `sandboxes/exoshell-base` keeps the community `sandbox` account, home `/sandbox`,
 and OpenShell-managed OCI workdir. The source share is mounted at `/workspace`.
-The machine-local final layer remaps `sandbox` to the host UID/GID so rootless
-Podman can write bind-mounted files without embedding personal IDs in shared
-sources.
+The machine-local final layer remaps `sandbox` to the host UID/GID by default so
+rootless Podman can write bind-mounted files without embedding personal IDs in
+shared sources. Explicit IDs paired with gateway `keep-id:uid=...,gid=...` cover
+host IDs outside the rootless mapping (ADR-0045).
 
 ## Launcher
 

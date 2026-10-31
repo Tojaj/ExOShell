@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1
 
-# Local-only ownership layer. Use build.sh so the IDs come from the host.
+# Local-only ownership layer. Use build.sh to select validated IDs.
 ARG BASE_IMAGE=localhost/exoshell-base:latest
 FROM ${BASE_IMAGE}
 
@@ -8,9 +8,9 @@ USER root
 
 ARG USER_UID
 ARG USER_GID
-# Remap community `sandbox` to the host UID/GID. Bare `userns=keep-id` keeps
-# those same numbers; it does not map the host user onto this account.
-# See adrs/adr0015-host-uid-remap-not-keep-id.md.
+# Remap community `sandbox` to the selected UID/GID (host IDs by default).
+# Explicit image IDs require matching `keep-id:uid=...,gid=...` at the gateway.
+# See adrs/adr0045-explicit-local-image-identity.md.
 # Community `base` omits /usr/sbin from PATH. Ubuntu Noble's `ubuntu` account
 # occupies 1000:1000; delete any non-sandbox occupant before remapping.
 RUN test -n "${USER_UID}" \
