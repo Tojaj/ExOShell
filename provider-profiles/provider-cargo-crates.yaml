@@ -38,3 +38,8 @@ binaries:
   - /usr/lib/node_modules/@opencode/cli/bin/opencode.exe
   - /usr/lib/node_modules/@opencode/**
   - /usr/bin/curl
+  # Version checker (bump-exoshell-base-versions) and scripted tooling
+  - /usr/bin/python3*
+  - /usr/local/bin/python3*
+  - /bin/bash
+  - /usr/bin/bash

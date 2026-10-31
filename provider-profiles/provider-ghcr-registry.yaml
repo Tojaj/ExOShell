@@ -38,3 +38,5 @@ binaries:
   - /usr/local/bin/oras
   - /usr/bin/skopeo
   - /usr/local/bin/skopeo
+  - /bin/bash
+  - /usr/bin/bash

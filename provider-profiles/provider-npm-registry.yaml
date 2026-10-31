@@ -45,3 +45,5 @@ binaries:
   - /usr/lib/node_modules/@opencode/cli/bin/opencode.exe
   - /usr/lib/node_modules/@opencode/**
   - /usr/bin/curl
+  - /bin/bash
+  - /usr/bin/bash
