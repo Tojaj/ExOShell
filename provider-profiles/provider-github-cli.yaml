@@ -84,3 +84,12 @@ binaries:
   - /usr/local/bin/pi
   - /usr/bin/pi
   - /usr/bin/curl
+  # Version checker (bump-exoshell-base-versions) and scripted tooling
+  - /usr/bin/python3*
+  - /usr/local/bin/python3*
+  - /usr/bin/uv
+  - /usr/local/bin/uv
+  - /usr/bin/uvx
+  - /usr/local/bin/uvx
+  - /bin/bash
+  - /usr/bin/bash
