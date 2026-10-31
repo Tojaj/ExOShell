@@ -49,6 +49,14 @@ merge_profile() {
 import sys
 import yaml
 
+
+class IndentDumper(yaml.SafeDumper):
+    # Match the repository style: indented block sequences instead of
+    # PyYAML's default indentless ones, so the diff only shows real changes.
+    def increase_indent(self, flow=False, indentless=False):
+        return super().increase_indent(flow, False)
+
+
 live_path, repo_path, out_path = sys.argv[1:4]
 with open(live_path) as handle:
     live = yaml.safe_load(handle)
@@ -59,7 +67,8 @@ for key in ("description", "endpoints", "binaries"):
         raise SystemExit(f"error: {repo_path} has no '{key}' to copy")
     live[key] = repo[key]
 with open(out_path, "w") as handle:
-    yaml.dump(live, handle, sort_keys=False, default_flow_style=False)
+    yaml.dump(live, handle, Dumper=IndentDumper, sort_keys=False,
+              default_flow_style=False, allow_unicode=True, width=4096)
 EOF
 }
 
