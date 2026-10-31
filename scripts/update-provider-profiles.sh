@@ -98,7 +98,17 @@ for id in "${WANT[@]}"; do
       *) echo "skip: $id"; SKIPPED+=("$id"); rm -rf "$work"; continue ;;
     esac
   fi
-  openshell provider profile lint -f "$work/merged.yaml"
+  openshell provider profile lint -f "$work/merged.yaml" >"$work/lint.log" 2>&1 || {
+    # `lint` rejects an ID that is already imported; that is expected when
+    # refreshing a profile, so only fail on diagnostics saying anything else.
+    if grep -i 'error' "$work/lint.log" | grep -viE 'already exists|lint failed' | grep -q .; then
+      cat "$work/lint.log" >&2
+      echo "error: lint failed for $id" >&2
+      rm -rf "$work"
+      exit 1
+    fi
+    echo "note: lint reports an already-imported ID (expected for updates)"
+  }
   openshell provider profile update "$id" -f "$work/merged.yaml"
   UPDATED+=("$id")
   rm -rf "$work"
