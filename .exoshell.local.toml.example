@@ -20,7 +20,7 @@ agent = "codex"
 # GWS initialization is automatic when its provider credentials are available.
 providers = ["exoshell-github", "exoshell-gws"]
 # Optionally add only the package registries this project needs:
-# providers = ["exoshell-github", "exoshell-gws", "exoshell-npm-registry-ro", "exoshell-pypi-packages-ro", "exoshell-ghcr-registry-ro", "exoshell-dockerhub-registry-ro", "exoshell-quay-registry-ro"]
+# providers = ["exoshell-github", "exoshell-gws", "exoshell-npm-registry-ro", "exoshell-pypi-packages-ro", "exoshell-ghcr-registry-ro", "exoshell-dockerhub-registry-ro", "exoshell-quay-registry-ro", "exoshell-android-kotlin-ro"]
 # pre-commit Python, Node and Go hooks need PyPI, npm and Go respectively.
 # npm and Go profiles also allow their runtime downloads; add
 # "exoshell-go-modules-ro" alongside npm and PyPI for Go hooks such as gitleaks.
