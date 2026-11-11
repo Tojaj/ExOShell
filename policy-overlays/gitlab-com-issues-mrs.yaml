@@ -7,6 +7,7 @@
 # Grants:
 #   glab issue create / update / close / reopen / note
 #   glab mr create / update / close / reopen / note
+#   Issue and merge-request discussion threads and replies
 #   glab api calls matching the same REST paths
 #
 # Does not grant git push (use gitlab-com-push.yaml), DELETE requests, merge or
@@ -45,13 +46,17 @@ network_policies:
           # Issues: create, edit, close, and reopen.
           - allow: { method: POST, path: "/api/v4/projects/*/issues" }
           - allow: { method: PUT, path: "/api/v4/projects/*/issues/*" }
-          # Issue notes: create.
+          # Issue notes, discussion threads, and replies: create.
           - allow: { method: POST, path: "/api/v4/projects/*/issues/*/notes" }
+          - allow: { method: POST, path: "/api/v4/projects/*/issues/*/discussions" }
+          - allow: { method: POST, path: "/api/v4/projects/*/issues/*/discussions/*/notes" }
           # Merge requests: create, edit, close, and reopen.
           - allow: { method: POST, path: "/api/v4/projects/*/merge_requests" }
           - allow: { method: PUT, path: "/api/v4/projects/*/merge_requests/*" }
-          # Merge-request notes: create.
+          # Merge-request notes, discussion threads, and replies: create.
           - allow: { method: POST, path: "/api/v4/projects/*/merge_requests/*/notes" }
+          - allow: { method: POST, path: "/api/v4/projects/*/merge_requests/*/discussions" }
+          - allow: { method: POST, path: "/api/v4/projects/*/merge_requests/*/discussions/*/notes" }
     binaries:
       - { path: /usr/bin/glab }
       - { path: /usr/local/bin/glab }
