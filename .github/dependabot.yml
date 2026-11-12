@@ -1,0 +1,12 @@
+version: 2
+
+updates:
+  - package-ecosystem: pip
+    directory: /
+    schedule:
+      interval: monthly
+    cooldown:
+      default-days: 7
+    allow:
+      - dependency-name: zensical
+    open-pull-requests-limit: 1

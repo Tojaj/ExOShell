@@ -3,8 +3,18 @@ name: Documentation
 on:
   pull_request:
     branches: [main]
+    paths:
+      - 'docs/**'
+      - zensical.toml
+      - requirements-docs.txt
+      - .github/workflows/docs.yaml
   push:
     branches: [main]
+    paths:
+      - 'docs/**'
+      - zensical.toml
+      - requirements-docs.txt
+      - .github/workflows/docs.yaml
   workflow_dispatch:
 
 permissions: {}

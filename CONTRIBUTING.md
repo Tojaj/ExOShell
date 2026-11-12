@@ -52,20 +52,37 @@ With a virtual environment active:
 ```bash
 python -m pip install -r requirements-docs.txt
 zensical serve
-# Production validation (also runs on pull requests):
+# Production validation (also runs on documentation pull requests):
 zensical build --clean --strict
 ```
 
 Open the local URL printed by `zensical serve`. Check light/dark mode, narrow
 screens, navigation, search, and code tabs when changing layout. Generated
-`site/` and `.cache/` content is ignored. Navigation is in `zensical.toml`.
+`site/` and `.cache/` content is ignored. Navigation is in `zensical.toml`;
+local page labels match their H1 headings, except the homepage's "Overview".
 
 The [Documentation workflow](.github/workflows/docs.yaml) validates pull
 requests and publishes pushes to `main` at <https://tojaj.github.io/ExOShell/>.
+Automatic runs are limited to changes in `docs/**`, `zensical.toml`,
+`requirements-docs.txt`, or the documentation workflow itself. General CI
+still runs on every pull request. Manual documentation runs remain available.
 For the initial publication, select **Settings → Pages → Build and deployment
 → Source → GitHub Actions** in the GitHub repository, then run the workflow on
-`main` (or push a change). Forks must update `site_url` and repository links
+`main` (or push a matching change). Forks must update `site_url` and repository links
 before publishing to their own Pages site. No custom domain is required.
+
+### Dependency updates
+
+Keep Zensical pinned in `requirements-docs.txt`. Once
+[the Dependabot configuration](.github/dependabot.yml) reaches the default
+branch, Dependabot checks monthly for Zensical updates and opens at most one
+version-update PR at a time. A seven-day release cooldown satisfies the
+repository's security lint. Only Zensical is included; development dependencies,
+pre-commit hooks, and GitHub Actions are outside this update configuration.
+
+Updates require manual review and merging. Require a successful strict build
+and preview the site with the proposed version before merging, including
+navigation, search, light/dark mode, narrow screens, and code tabs.
 
 ## Commit messages
 
