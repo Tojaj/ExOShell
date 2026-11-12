@@ -50,4 +50,4 @@ cache. Existing package rules and agent binaries will remain available.
 - [nodeenv installer](https://raw.githubusercontent.com/ekalinin/nodeenv/master/nodeenv.py)
 - [OpenShell policy schema and binary matching](https://docs.nvidia.com/openshell/how-it-works/policies/schema)
 - [OpenShell policy update source](https://github.com/NVIDIA/OpenShell/blob/main/crates/openshell-cli/src/policy_update.rs)
-- [Provider setup and updates](../providers.md#pre-commit-runtime-setup)
+- [Provider setup and updates](../docs/integrations/registries.md#pre-commit-runtime-setup)

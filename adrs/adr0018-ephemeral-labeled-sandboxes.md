@@ -64,6 +64,6 @@ when a sandbox must remain after the agent exits.
 ## References
 
 - [Launcher implementation](../scripts/exoshell_agent.py)
-- [Launcher documentation](../README.md)
+- [Launcher documentation](../docs/reference/launcher.md)
 - [ADR-0016: Multi-agent launcher and ephemeral state](adr0016-multi-agent-launcher-and-ephemeral-state.md)
 - [OpenShell sandbox management](https://docs.nvidia.com/openshell/sandboxes/manage-sandboxes)

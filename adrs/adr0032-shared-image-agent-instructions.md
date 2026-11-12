@@ -74,7 +74,7 @@ customization repositories.
 
 - [Original OpenCode instruction decision](adr0022-opencode-image-instructions.md)
 - [System Codex configuration](adr0013-system-codex-configuration.md)
-- [Shared instruction sources](../sandboxes/exoshell-base/agent-instructions/)
+- [Shared instruction sources](../sandboxes/exoshell-base/agent-instructions)
 - [Build helper](../sandboxes/exoshell-base/render-agent-instructions.py)
 - [Base image Dockerfile](../sandboxes/exoshell-base/Dockerfile)
 - [Codex configuration reference](https://learn.chatgpt.com/docs/config-file/config-reference)

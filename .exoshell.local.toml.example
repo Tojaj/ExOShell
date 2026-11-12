@@ -26,6 +26,8 @@ providers = ["exoshell-github", "exoshell-gws"]
 # "exoshell-go-modules-ro" alongside npm and PyPI for Go hooks such as gitleaks.
 # Ubuntu APT repository access (system installs also need filesystem permissions):
 # Add "exoshell-ubuntu-apt-ro" to the common providers array above.
+# Agent web research through Tavily:
+# Add "exoshell-tavily-search" to the common providers array above.
 
 # Optional integrations are disabled when omitted.
 # policy = "policies/policy.yaml"

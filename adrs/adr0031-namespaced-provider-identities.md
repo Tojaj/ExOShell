@@ -69,6 +69,6 @@ neither prefix nor origin alone will authorize deletion.
 
 - [OpenShell provider profiles](https://docs.nvidia.com/openshell/how-it-works/providers/profiles)
 - [OpenShell profile representation and annotations](https://github.com/NVIDIA/OpenShell/blob/main/crates/openshell-providers/src/profiles.rs)
-- [Provider guide](../providers.md)
+- [Provider guide](../docs/integrations/index.md)
 - [ADR-0024](adr0024-opt-in-package-registry-providers.md)
 - [ADR-0027](adr0027-separate-customization-repository.md)

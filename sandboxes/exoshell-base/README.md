@@ -92,7 +92,7 @@ The image includes these command-line tools:
 - `tkn` — inspect and run Tekton pipelines and tasks.
 
 Package installation and downloads require an attached
-[package registry provider](../../providers.md#opt-in-package-registries).
+[package registry provider](../../docs/integrations/registries.md#opt-in-package-registries).
 In particular, `uvx` cannot fetch Python MCP dependencies from PyPI without
 the `exoshell-pypi-packages-ro` provider. Go and Cargo are not installed in this image.
 Public image inspection and downloads with `skopeo` or `oras` require the
@@ -114,7 +114,7 @@ writing a project file or serializing the credential. Explicit inline provider
 selection or `websearch: false` is preserved; otherwise the startup selection
 overrides file-based search settings. Without the key, search settings are
 unchanged. Rebuild the base and dependent images to enable this behavior.
-See [Tavily setup](../../providers.md#tavily-web-search).
+See [Tavily setup](../../docs/integrations/web-search.md#tavily-web-search).
 
 `exoshell-agent` prepares Codex authentication before starting the requested
 Codex command. With a non-empty `OPENAI_API_KEY`, it runs
@@ -142,7 +142,7 @@ Codex treats them as developer instructions; higher-precedence configuration
 can replace the entire value. Claude's managed memory supplies behavioral
 guidance, not technical enforcement. Rebuild the base and derived images after
 changing the sources. See [ADR-0032](../../adrs/adr0032-shared-image-agent-instructions.md)
-and [derived-image instructions](../../CUSTOMIZATION.md#shared-agent-instructions).
+and [derived-image instructions](../../docs/customize/images.md#shared-agent-instructions).
 
 Atlassian MCP is disabled by default. `exoshell-agent` enables it at startup
 only with a non-empty provider credential placeholder. Runtime overrides
@@ -150,7 +150,7 @@ control the `atlassian` entry even when a project config disagrees. Claude's
 non-secret MCP template is installed at `/etc/exoshell/claude-atlassian.json`;
 the helper registers it in `/sandbox/.claude/.claude.json` only when enabled.
 `CLAUDE_CONFIG_DIR=/sandbox/.claude` keeps mutable Claude state within the
-existing writable policy. See [Atlassian setup and smoke checks](../../providers.md#atlassian-rovo-mcp).
+existing writable policy. See [Atlassian setup and smoke checks](../../docs/integrations/atlassian.md#atlassian-rovo-mcp).
 
 ## Agent skills
 

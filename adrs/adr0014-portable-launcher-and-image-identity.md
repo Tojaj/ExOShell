@@ -59,6 +59,6 @@ accepts besides a numeric UID/GID.
 ## References
 
 - [Launcher](../run-exoshell-agent.sh)
-- [Generic image](../sandboxes/exoshell-base/)
-- [Local identity layer](../sandboxes/local-user/)
+- [Generic image](../sandboxes/exoshell-base)
+- [Local identity layer](../sandboxes/local-user)
 - [ADR-0015](adr0015-host-uid-remap-not-keep-id.md) — why `keep-id` does not replace that layer

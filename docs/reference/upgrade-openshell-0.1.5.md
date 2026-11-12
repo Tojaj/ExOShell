@@ -30,7 +30,7 @@ For private PKI, stage a gateway-readable PEM on the gateway host **before**
 restarting, then set Podman's `additional_ca_bundle` to its absolute path.
 This augments public roots in both supervisor and workload trust bundles.
 Malformed or unreadable bundles can prevent gateway startup. Follow
-[customization instructions](../CUSTOMIZATION.md#private-ca-for-inspected-podman-https-egress);
+[customization instructions](../customize/images.md#private-ca-for-inspected-podman-https-egress);
 private certificate sources belong in the customization repository.
 
 Keep polling, the release default. Optional
@@ -48,7 +48,7 @@ profile IDs, credentials, and binary selectors are unchanged.
 
 Lint each changed profile with `openshell provider profile lint -f PATH`.
 For existing imported profiles, use the documented
-[resource-version update procedure](../providers.md#provider-lifecycle)
+[resource-version update procedure](../integrations/index.md#provider-lifecycle)
 rather than create-only import. Export profiles to temporary files, carry their
 resource versions into temporary copies of the updated YAML, and update those
 copies. Do not commit gateway resource versions or recreate credentials just
@@ -64,7 +64,14 @@ The launcher now records `exoshell.policy-source-file` as sandbox metadata.
 Overlay `--revert` uses its current contents unless `--base-file` overrides it.
 Older sandboxes, `--no-policy` launches, and unavailable recorded files require
 an explicit baseline; there is no checkout-config fallback. See the
-[overlay guide](../policy-overlays/README.md#apply-and-revert).
+[overlay guide](https://github.com/Tojaj/ExOShell/blob/main/policy-overlays/README.md#apply-and-revert).
+
+## Update launcher configuration
+
+Remove the former `gws` key from local TOML files and `--gws`/`--no-gws` from
+launcher commands; these options are no longer accepted. Attaching the
+[Google Workspace provider](../integrations/google-workspace.md) now controls
+that integration on its own.
 
 ## Acceptance on the gateway host
 

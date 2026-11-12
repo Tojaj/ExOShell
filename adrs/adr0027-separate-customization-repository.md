@@ -32,7 +32,7 @@ existing OpenShell and ExOShell interfaces rather than fork the launcher.
 
 ## References
 
-- [Separate customization repository](../CUSTOMIZATION.md#separate-customization-repository)
+- [Separate customization repository](../docs/customize/index.md#separate-customization-repository)
 - [Launcher](../scripts/exoshell_agent.py)
 - [Policy overlays](../policy-overlays/README.md)
 - [OpenShell provider profiles](https://docs.nvidia.com/openshell/sandboxes/providers-v2)

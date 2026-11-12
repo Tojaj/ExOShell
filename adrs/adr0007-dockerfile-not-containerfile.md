@@ -46,5 +46,5 @@ We will name the sandbox build-instruction file `Dockerfile` (`sandboxes/exoshel
 - [OpenShell issue #2420](https://github.com/NVIDIA/OpenShell/issues/2420) — add support for `Containerfile`-named files
 - [OpenShell issue #2779](https://github.com/NVIDIA/OpenShell/issues/2779) — build through selected runtime (Podman support)
 - [OpenShell 0.1.0 upgrade guide](https://docs.nvidia.com/openshell/upgrade/0-1-0)
-- [`sandboxes/exoshell-base/`](../sandboxes/exoshell-base/) — image definition directory
-- [`adr0005-custom-sandbox-image.md`](./adr0005-custom-sandbox-image.md) — why a custom image is used
+- [`sandboxes/exoshell-base/`](../sandboxes/exoshell-base) — image definition directory
+- [`adr0005-custom-sandbox-image.md`](adr0005-custom-sandbox-image.md) — why a custom image is used

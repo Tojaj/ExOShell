@@ -123,7 +123,7 @@ composition time and refuses to apply if more than one endpoint with
   `/graphql` endpoint. If OpenShell ships an update to `providers/github.yaml`
   (new credentials, new git rules, new binaries), the local copy must be
   reviewed and updated manually. The provider profile update procedure is in
-  [`providers.md`](../providers.md).
+  [Provider documentation](../docs/integrations/index.md).
 - A one-time migration is required: `openshell sandbox delete <sandbox-name>`,
   `openshell provider delete gh-personal`, and recreation with
   `--type github-cli`.

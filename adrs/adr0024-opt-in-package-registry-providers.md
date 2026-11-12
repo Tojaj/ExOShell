@@ -44,6 +44,6 @@ use those endpoints.
 
 - [Upstream credential-free PyPI example](https://github.com/NVIDIA/OpenShell/blob/main/providers/pypi.yaml)
 - [OpenShell Providers v2](https://docs.nvidia.com/openshell/sandboxes/providers-v2)
-- [ExOShell provider setup](../providers.md)
+- [ExOShell provider setup](../docs/integrations/index.md)
 - [ExOShell baseline policy](../policies/policy.yaml)
 - [ExOShell policy overlays](../policy-overlays/README.md)

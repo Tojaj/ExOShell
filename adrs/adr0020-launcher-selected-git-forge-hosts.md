@@ -53,5 +53,5 @@ third supported forge demonstrates a shared, stable configuration contract.
 ## References
 
 - [Launcher implementation](../scripts/exoshell_agent.py)
-- [Customization guide](../CUSTOMIZATION.md)
+- [Customization guide](../docs/customize/index.md)
 - [ADR-0012](adr0012-bake-token-free-glab-host-config.md)
