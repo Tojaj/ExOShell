@@ -147,6 +147,12 @@ openshell provider profile import \
   -f provider-profiles/provider-gitlab-enterprise-cli.yaml
 ```
 
+For profiles supplied by ExOShell, the
+[profile update helper](../integrations/update-provider-profiles.md) applies
+the checkout's description, endpoints, and binaries while preserving other
+live fields. Use the manual workflow below for custom profiles or changes to
+other fields.
+
 Profile import is create-only. To update an imported profile, export it first,
 preserve its `resource_version`, apply the edits to that exported document, and
 submit an update:

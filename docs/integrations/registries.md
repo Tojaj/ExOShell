@@ -242,25 +242,19 @@ must also be writable under the selected filesystem policy.
 
 ## Update an imported profile
 
-For profiles already imported on the host, import is create-only. Export each
-profile, copy the corresponding repository definition's description, endpoints
-and binaries into the exported document while preserving its `resource_version`
-and other deployment metadata, then lint and update it:
+For profiles already imported on the host, use the
+[profile update helper](update-provider-profiles.md) to apply the definitions
+from your updated checkout:
 
 ```bash
-openshell provider profile export exoshell-npm-registry-ro -o yaml > /tmp/exoshell-npm-registry-ro.yaml
-openshell provider profile export exoshell-go-modules-ro -o yaml > /tmp/exoshell-go-modules-ro.yaml
-# Edit the exported documents as described above before running these commands.
-openshell provider profile lint -f /tmp/exoshell-npm-registry-ro.yaml
-openshell provider profile lint -f /tmp/exoshell-go-modules-ro.yaml
-openshell provider profile update exoshell-npm-registry-ro -f /tmp/exoshell-npm-registry-ro.yaml
-openshell provider profile update exoshell-go-modules-ro -f /tmp/exoshell-go-modules-ro.yaml
+./scripts/update-provider-profiles.sh exoshell-npm-registry-ro exoshell-go-modules-ro
 ```
 
 Updates affect every instance of that profile and reach attached running
 sandboxes on their next configuration sync. Inspect the effective policy with
 `openshell policy get <sandbox> --full` before retrying hook installation.
-See [profile update instructions](../customize/providers.md#lint-and-import-profiles).
+See [Update provider profiles](update-provider-profiles.md) for prerequisites
+and the fields the helper replaces.
 
 For a temporary live network grant, `openshell policy update` accepts multiple
 `--add-endpoint` flags only when `--rule-name` is omitted; a named update accepts
