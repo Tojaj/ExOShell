@@ -19,6 +19,7 @@ nav = [
   ] },
   { "Integrations" = [
     { "Overview" = "integrations/index.md" },
+    { "Update provider profiles" = "integrations/update-provider-profiles.md" },
     { "Inference providers" = "integrations/inference.md" },
     { "GitHub and GitLab" = "integrations/forges.md" },
     { "Opt-in package registries" = "integrations/registries.md" },

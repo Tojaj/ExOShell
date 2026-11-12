@@ -59,7 +59,13 @@ openshell provider profile lint -f provider-profiles/provider-example.yaml
 openshell provider profile import -f provider-profiles/provider-example.yaml
 ```
 
-Profile import is create-only. To change an imported profile, export its
+Profile import is create-only. After updating your ExOShell checkout, use
+[`scripts/update-provider-profiles.sh`](update-provider-profiles.md) to refresh
+already-imported profiles from its definitions. The script shows a diff and
+asks before applying each update; see [Update provider profiles](update-provider-profiles.md)
+for prerequisites, profile selection, and the fields it replaces.
+
+For manual changes to an imported profile, export its
 current resource version, copy that value into the local profile YAML, then
 update the profile:
 
