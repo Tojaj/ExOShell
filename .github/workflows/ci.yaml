@@ -37,6 +37,8 @@ jobs:
         run: python -m pip install --no-cache-dir -r requirements-dev.txt
       - name: Run pre-commit
         run: pre-commit run --all-files --show-diff-on-failure
+      - name: Scan checkout for secrets
+        run: pre-commit run gitleaks-checkout --all-files --hook-stage manual
 
   unit-tests:
     name: unit-tests

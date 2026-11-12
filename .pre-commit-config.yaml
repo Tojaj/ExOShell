@@ -45,3 +45,24 @@ repos:
     hooks:
       - id: zizmor
         args: [--offline, --no-progress, --persona=auditor]
+
+  - repo: https://github.com/gitleaks/gitleaks
+    rev: 83d9cd684c87d95d656c1458ef04895a7f1cbd8e # v8.30.1
+    hooks:
+      - id: gitleaks
+        language_version: '1.27.4'
+        stages: [pre-commit]
+      - id: gitleaks
+        alias: gitleaks-checkout
+        name: Detect hardcoded secrets in checkout
+        language_version: '1.27.4'
+        # The upstream entry scans only staged changes, which are empty in CI.
+        entry: gitleaks dir --redact --verbose .
+        stages: [manual]
+        always_run: true
+
+  - repo: https://github.com/stbenjam/skillsaw
+    rev: b11cf99c18ee5b1b2cb3156094b1a7d39fa0f1c7 # v0.23.0
+    hooks:
+      - id: skillsaw
+        args: [--fail-on=error, --no-custom-rules, --no-plugins, --no-baseline, --no-progress]

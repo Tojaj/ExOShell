@@ -10,6 +10,7 @@ python3 -m venv .venv
 . .venv/bin/activate
 python -m pip install -r requirements-dev.txt
 pre-commit run --all-files --show-diff-on-failure
+pre-commit run gitleaks-checkout --all-files --hook-stage manual
 ```
 
 Pre-commit installs its pinned tools into isolated environments. The first run
@@ -29,6 +30,18 @@ Pre-commit downloads the pinned Go toolchain and builds actionlint in an
 isolated environment; a system Go installation is unnecessary. Keep the
 development virtual environment active so actionlint can find the pinned
 ShellCheck installed by `requirements-dev.txt` to check workflow `run:` blocks.
+
+Gitleaks checks staged changes for secrets such as API tokens during normal
+pre-commit runs. The separate `gitleaks-checkout` command above scans the whole
+working tree, including untracked local files; CI runs it against a fresh
+checkout so committed secrets are checked even with no staged changes. Both
+scans redact detected values. They do not scan the full Git history.
+
+Skillsaw checks agent instructions and skills. Errors fail the check; prose
+warnings remain advisory. To see warnings, run
+`pre-commit run skillsaw --all-files --verbose`. Custom rules, installed rule
+plugins, and baseline suppression are disabled so PR-controlled configuration
+cannot load custom Python or hide existing findings through a baseline.
 
 To run just Python linting and formatting:
 

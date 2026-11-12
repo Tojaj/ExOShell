@@ -42,6 +42,13 @@ installed-client tests listed in the runner may skip on hosts, and only for
 their specific missing-client reasons. A strict invocation will require zero
 skips. Empty suites will fail as well.
 
+We will run Gitleaks with redacted output on staged changes locally and on the
+whole fresh checkout in CI; the staged-only upstream entry is insufficient for
+hosted runs. Skillsaw will reject errors in agent instructions and skills while
+leaving prose warnings advisory. Its custom rules, installed rule plugins, and
+baseline suppression will be disabled when checking contributor-controlled
+content. Both tools will use their upstream hooks with immutable commit pins.
+
 ## Consequences
 
 - Contributors get automatic formatting and validation with the same tools
