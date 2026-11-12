@@ -45,7 +45,7 @@ Once configured:
 
 - [Integrations](docs/integrations/index.md): inference, forges, packages, and MCP.
 - [Customize](docs/customize/index.md): images, policies, and private infrastructure.
-- [Troubleshooting](docs/reference/troubleshooting.md) and [upgrade guide](docs/upgrade-openshell-0.1.5.md).
+- [Troubleshooting](docs/reference/troubleshooting.md) and [upgrade guide](docs/reference/upgrade-openshell-0.1.5.md).
 - [Architecture](ARCHITECTURE.md), [specification](SPEC.md), and [ADRs](adrs/).
 - [Contributing and documentation preview](CONTRIBUTING.md).
 

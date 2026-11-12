@@ -14,18 +14,19 @@ openshell sandbox list --selector managed-by=exoshell,project=exoshell -o json
 ```
 
 The default `sandbox list` table does not show labels; use a selector or JSON
-or YAML output to inspect them. CLI `--provider` options replace the complete
-common-plus-agent list; `--no-providers` clears it. Other settings can be
-cleared with `--no-policy`, `--no-kubeconfig`, or
-`--no-github-host` or `--no-gitlab-host`.
+or YAML output to inspect them.
 
 ## Credentials and state
 
 API credentials remain provider-backed placeholders. Claude Code supports an
 Anthropic API key here; subscription OAuth is out of scope because it needs
 sandbox-readable persistent credentials. OpenCode can use the provided OpenAI,
-Anthropic, or OpenRouter profiles. Do not use OpenCode `/connect`: it writes
-readable credentials to `~/.local/share/opencode/auth.json`.
+Anthropic, or OpenRouter profiles.
+
+!!! warning "Do not use OpenCode `/connect`"
+    It writes readable credentials to
+    `~/.local/share/opencode/auth.json`. The attached provider already supplies
+    the key as a placeholder.
 
 Agent state remains in the sandbox container layer. It is discarded with the
 default `--no-keep` lifecycle, including histories, onboarding choices,

@@ -15,7 +15,7 @@ You need:
 - An API key for the inference provider you choose below.
 
 Install OpenShell using its [upstream documentation](https://docs.nvidia.com/openshell/).
-If upgrading an existing installation, follow the [migration guide](upgrade-openshell-0.1.5.md).
+If upgrading an existing installation, follow the [migration guide](reference/upgrade-openshell-0.1.5.md).
 
 ```bash
 git clone https://github.com/Tojaj/ExOShell.git
@@ -63,7 +63,8 @@ If sandboxes must reach services behind a private certificate authority, add
 
 This builds the shared tools image and a local layer that maps the `sandbox`
 account to your host UID/GID. Both this local layer and `userns = "keep-id"`
-are needed for writable project mounts.
+are needed for writable project mounts. The first run pulls the community base
+image and installs the agent CLIs, so expect it to take several minutes.
 
 ## 4. Set up one inference provider
 
@@ -129,8 +130,9 @@ launcher stops when none is selected; see [custom policies](customize/policies.m
 to adapt it.
 
 Ask the agent to report its user and working directory: expect `sandbox` and
-`/workspace` when only the project is shared. Exit the agent to delete the
-sandbox; project edits remain on the host.
+`/workspace` when only the project is shared. Then leave the agent with `/exit`
+or Ctrl-D: the sandbox and everything written outside the project are deleted,
+while edits inside the project remain on the host.
 
 Already imported a profile? Use the [update procedure](integrations/index.md#provider-lifecycle)
 instead of importing it again. See [inference providers](integrations/inference.md)

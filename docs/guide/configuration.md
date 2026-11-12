@@ -40,6 +40,10 @@ itself; CLI paths resolve relative to the caller's directory. Absent discovery
 candidates are skipped, but an invalid, unreadable, or non-file candidate stops
 the launch, as does a missing explicit `--config` file.
 
+Each `--no-*` option discards the configured value for one launch rather than
+replacing it: `--no-providers`, `--no-policy`, `--no-skills`, `--no-model`,
+`--no-effort`, `--no-kubeconfig`, `--no-github-host`, and `--no-gitlab-host`.
+
 ## Choose a policy
 
 Select a policy with `--policy /path/to/policy.yaml` or the TOML `policy`

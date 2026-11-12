@@ -27,6 +27,8 @@ Publishing, login, and unrelated POST/PUT/PATCH/DELETE requests are not granted.
 installation, require the `exoshell-pypi-packages-ro` instance. Having uv in
 the image does not grant PyPI access.
 
+## Set up an ecosystem
+
 Import and create only the ecosystems needed by a project. For each desired
 name below (for example `exoshell-npm-registry-ro`), run:
 
@@ -64,71 +66,43 @@ openshell provider create --name exoshell-quay-registry-ro --type exoshell-quay-
 These profiles have no credential discovery. They compose with an agent's
 inference provider; their names select provider *instances*, not profile files.
 
-### pre-commit runtime setup
+Ubuntu APT has its own [setup section](#ubuntu-apt) below.
 
-Attach npm, PyPI and Go alongside the inference and source-control providers
-when hooks use those ecosystems. For example:
+## Attach instances to a session
+
+For repeat use, add the selected instance names to the common `providers`
+array in `.exoshell.local.toml` so Codex, Claude Code, and OpenCode all get
+them. For one run, repeat `--provider` for **every** desired instance, including
+the inference provider: CLI options replace the complete configured list.
 
 ```bash
-openshell provider profile lint -f provider-profiles/provider-go-modules.yaml
-openshell provider profile import -f provider-profiles/provider-go-modules.yaml
-openshell provider create --name exoshell-go-modules-ro --type exoshell-go-modules-ro
-
 ./run-exoshell-agent.sh --policy policies/policy.yaml --agent codex \
-  --provider exoshell-codex --provider exoshell-github \
-  --provider exoshell-npm-registry-ro --provider exoshell-pypi-packages-ro \
-  --provider exoshell-go-modules-ro .
+  --provider exoshell-codex --provider exoshell-dockerhub-registry-ro --provider exoshell-quay-registry-ro \
+  . -- exec 'reply with OK'
 ```
 
-Create the other instances first using the instructions above. CLI provider
-options replace the configured list, so include every instance needed for that
-session. For repeat use, add the ecosystem instances to the common `providers`
-array in `.exoshell.local.toml`; an existing npm/PyPI selection also needs
-`exoshell-go-modules-ro` for Go hooks such as gitleaks.
-
-[pre-commit's Go installer](https://raw.githubusercontent.com/pre-commit/pre-commit/main/pre_commit/languages/golang.py)
-queries `go.dev/dl/?mode=json` when resolving the default Go version and fetches
-archives from `dl.google.com/go/`.
-[nodeenv](https://raw.githubusercontent.com/ekalinin/nodeenv/master/nodeenv.py)
-fetches Node metadata and archives from `nodejs.org/download/release/`.
-The npm and Go profiles allow GET/HEAD/OPTIONS on these paths, with enforced
-HTTP inspection. The Go archive path selector also avoids an equal-specificity
-conflict with the shared baseline's `**.google.com` audit endpoint.
-
-Both profiles include the base image's uv-managed Python interpreters and
-pre-commit's downloaded Node or Go executables under
-`/sandbox/.cache/pre-commit/repo*/`. If `PRE_COMMIT_HOME` or `XDG_CACHE_HOME`
-relocates that cache, adapt the executable patterns in a custom profile.
-Other runtime mirrors and unofficial Node builds need separately reviewed
-endpoints. These profiles grant network access; runtime and cache directories
-must also be writable under the selected filesystem policy.
-
-For profiles already imported on the host, import is create-only. Export each
-profile, copy the corresponding repository definition's description, endpoints
-and binaries into the exported document while preserving its `resource_version`
-and other deployment metadata, then lint and update it:
+Direct OpenShell launches can also attach them independently:
 
 ```bash
-openshell provider profile export exoshell-npm-registry-ro -o yaml > /tmp/exoshell-npm-registry-ro.yaml
-openshell provider profile export exoshell-go-modules-ro -o yaml > /tmp/exoshell-go-modules-ro.yaml
-# Edit the exported documents as described above before running these commands.
-openshell provider profile lint -f /tmp/exoshell-npm-registry-ro.yaml
-openshell provider profile lint -f /tmp/exoshell-go-modules-ro.yaml
-openshell provider profile update exoshell-npm-registry-ro -f /tmp/exoshell-npm-registry-ro.yaml
-openshell provider profile update exoshell-go-modules-ro -f /tmp/exoshell-go-modules-ro.yaml
+openshell sandbox create --from localhost/exoshell-local:latest \
+  --policy policies/policy.yaml --provider exoshell-codex --provider exoshell-npm-registry-ro \
+  -- codex
 ```
 
-Updates affect every instance of that profile and reach attached running
-sandboxes on their next configuration sync. Inspect the effective policy with
-`openshell policy get <sandbox> --full` before retrying hook installation.
-See [profile update instructions](../customize/providers.md#lint-and-import-profiles).
+Add the workspace mount and image startup command as described in the
+[image guide](https://github.com/Tojaj/ExOShell/blob/main/sandboxes/exoshell-base/README.md) when working on a host project.
 
-For a temporary live network grant, `openshell policy update` accepts multiple
-`--add-endpoint` flags only when `--rule-name` is omitted; a named update accepts
-one endpoint. A broad enforced `dl.google.com` endpoint may conflict with the
-baseline Google audit rule, so prefer the path-scoped profile update above.
+The base image supplies npm, uv/uvx and the agents; it does not install Go or
+Cargo. Go hooks can bootstrap Go as described under
+[pre-commit hook runtimes](#pre-commit-hook-runtimes). For other uses, install
+the tools in a derived image and check their
+kernel-resolved executable paths against the profile `binaries` list (for
+example, `readlink -f "$(command -v go)"`). OpenShell matches the resolved
+executable and its ancestors, not a package-manager script named in argv.
+For npm, that executable is `/usr/bin/node`; for Python it may be a uv-managed
+interpreter under `/sandbox/.uv/python/`.
 
-### Ubuntu APT
+## Ubuntu APT
 
 ```bash
 openshell provider profile lint -f provider-profiles/provider-ubuntu-apt.yaml
@@ -143,10 +117,6 @@ Attach the instance alongside the agent's inference provider:
   --provider exoshell-codex --provider exoshell-ubuntu-apt-ro \
   . -- exec 'reply with OK'
 ```
-
-CLI provider options replace the configured list; include any other instances
-needed for that launch. For repeat use, add `exoshell-ubuntu-apt-ro` to the common
-`providers` array in `.exoshell.local.toml`.
 
 The profile covers `/ubuntu/**` on the main, security and old-release archives,
 and `/ubuntu-ports/**` on the ports archive, on ports 80 and 443. These paths
@@ -177,7 +147,7 @@ installation also requires appropriate privileges and writable APT/dpkg state
 and installation paths. Use a separately configured sandbox policy or add
 packages to a derived image as described in [customization](../customize/index.md).
 
-### Container registry details
+## Container registries
 
 The `exoshell-ghcr-registry-ro` profile permits agents, `curl`, `oras`, `skopeo`, and Python
 to read public GHCR tokens, image manifests, and artifacts. GHCR may redirect blob
@@ -232,35 +202,72 @@ writable local OCI layout in the same sandbox, for example:
 skopeo copy docker://docker.io/library/alpine:latest oci:/tmp/alpine-smoke:latest
 ```
 
-For repeat use, add the selected instance names to the common `providers`
-array in `.exoshell.local.toml` so Codex, Claude Code, and OpenCode all get
-them. For one run, repeat `--provider` for **every** desired instance, including
-the inference provider: CLI options replace the complete configured list.
+## pre-commit hook runtimes
+
+Attach npm, PyPI and Go alongside the inference and source-control providers
+when hooks use those ecosystems. For example:
 
 ```bash
+openshell provider profile lint -f provider-profiles/provider-go-modules.yaml
+openshell provider profile import -f provider-profiles/provider-go-modules.yaml
+openshell provider create --name exoshell-go-modules-ro --type exoshell-go-modules-ro
+
 ./run-exoshell-agent.sh --policy policies/policy.yaml --agent codex \
-  --provider exoshell-codex --provider exoshell-dockerhub-registry-ro --provider exoshell-quay-registry-ro \
-  . -- exec 'reply with OK'
+  --provider exoshell-codex --provider exoshell-github \
+  --provider exoshell-npm-registry-ro --provider exoshell-pypi-packages-ro \
+  --provider exoshell-go-modules-ro .
 ```
 
-Direct OpenShell launches can also attach them independently:
+Create the other instances first using the instructions above. For repeat use,
+add the ecosystem instances to the common `providers` array in
+`.exoshell.local.toml`; an existing npm/PyPI selection also needs
+`exoshell-go-modules-ro` for Go hooks such as gitleaks.
+
+[pre-commit's Go installer](https://raw.githubusercontent.com/pre-commit/pre-commit/main/pre_commit/languages/golang.py)
+queries `go.dev/dl/?mode=json` when resolving the default Go version and fetches
+archives from `dl.google.com/go/`.
+[nodeenv](https://raw.githubusercontent.com/ekalinin/nodeenv/master/nodeenv.py)
+fetches Node metadata and archives from `nodejs.org/download/release/`.
+The npm and Go profiles allow GET/HEAD/OPTIONS on these paths, with enforced
+HTTP inspection. The Go archive path selector also avoids an equal-specificity
+conflict with the shared baseline's `**.google.com` audit endpoint.
+
+Both profiles include the base image's uv-managed Python interpreters and
+pre-commit's downloaded Node or Go executables under
+`/sandbox/.cache/pre-commit/repo*/`. If `PRE_COMMIT_HOME` or `XDG_CACHE_HOME`
+relocates that cache, adapt the executable patterns in a custom profile.
+Other runtime mirrors and unofficial Node builds need separately reviewed
+endpoints. These profiles grant network access; runtime and cache directories
+must also be writable under the selected filesystem policy.
+
+## Update an imported profile
+
+For profiles already imported on the host, import is create-only. Export each
+profile, copy the corresponding repository definition's description, endpoints
+and binaries into the exported document while preserving its `resource_version`
+and other deployment metadata, then lint and update it:
 
 ```bash
-openshell sandbox create --from localhost/exoshell-local:latest \
-  --policy policies/policy.yaml --provider exoshell-codex --provider exoshell-npm-registry-ro \
-  -- codex
+openshell provider profile export exoshell-npm-registry-ro -o yaml > /tmp/exoshell-npm-registry-ro.yaml
+openshell provider profile export exoshell-go-modules-ro -o yaml > /tmp/exoshell-go-modules-ro.yaml
+# Edit the exported documents as described above before running these commands.
+openshell provider profile lint -f /tmp/exoshell-npm-registry-ro.yaml
+openshell provider profile lint -f /tmp/exoshell-go-modules-ro.yaml
+openshell provider profile update exoshell-npm-registry-ro -f /tmp/exoshell-npm-registry-ro.yaml
+openshell provider profile update exoshell-go-modules-ro -f /tmp/exoshell-go-modules-ro.yaml
 ```
 
-Add the workspace mount and image startup command as described in the
-[image guide](https://github.com/Tojaj/ExOShell/blob/main/sandboxes/exoshell-base/README.md) when working on a host project.
-The base image supplies npm, uv/uvx and the agents; it does not install Go or
-Cargo. Go hooks can bootstrap Go as described above. For other uses, install
-the tools in a derived image and check their
-kernel-resolved executable paths against the profile `binaries` list (for
-example, `readlink -f "$(command -v go)"`). OpenShell matches the resolved
-executable and its ancestors, not a package-manager script named in argv.
-For npm, that executable is `/usr/bin/node`; for Python it may be a uv-managed
-interpreter under `/sandbox/.uv/python/`.
+Updates affect every instance of that profile and reach attached running
+sandboxes on their next configuration sync. Inspect the effective policy with
+`openshell policy get <sandbox> --full` before retrying hook installation.
+See [profile update instructions](../customize/providers.md#lint-and-import-profiles).
+
+For a temporary live network grant, `openshell policy update` accepts multiple
+`--add-endpoint` flags only when `--rule-name` is omitted; a named update accepts
+one endpoint. A broad enforced `dl.google.com` endpoint may conflict with the
+baseline Google audit rule, so prefer the path-scoped profile update above.
+
+## Private mirrors and enterprise registries
 
 To use an enterprise proxy, mirror, or private registry, copy the relevant
 profile YAML under a new filename, change `id`, `display_name` and the endpoint

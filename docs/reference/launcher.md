@@ -14,7 +14,7 @@ complete help, run `./run-exoshell-agent.sh --help`.
 | `--config PATH` | — | Load exactly this configuration file |
 | `-v`, `--verbose` | — | Report configuration selection and effective settings |
 | `--image IMAGE` | `image` | Select the OCI image; default `localhost/exoshell-local:latest` |
-| `--policy PATH` / `--no-policy` | `policy` | Select a policy, or explicitly delegate selection to OpenShell |
+| `--policy PATH` / `--no-policy` | `policy` | Select a policy, or delegate selection to OpenShell (which may then apply an environment or inherited image policy — see [configuration](../guide/configuration.md#choose-a-policy)) |
 | `--provider NAME` / `--no-providers` | `providers`, `agents.<agent>.providers` | Repeat to replace the composed provider list, or clear it |
 | `--host-share PATH` | `host_share` | Mount a source tree containing the selected project |
 | `--no-share` | — | Suppress project and kubeconfig mounts; use a disposable workspace |

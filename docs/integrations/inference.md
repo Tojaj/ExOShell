@@ -92,9 +92,10 @@ credential denial. Never use a real credential for this test.
 `exoshell-opencode-openrouter` supplies an OpenRouter API key to OpenCode. It is the
 default OpenCode provider in the example launcher configuration.
 
-Do not use OpenCode's `/connect` flow. It writes readable credentials to
-`~/.local/share/opencode/auth.json`; OpenCode must consume the provider-exported
-placeholder instead.
+!!! warning "Do not use OpenCode's `/connect` flow"
+    It writes readable credentials to `~/.local/share/opencode/auth.json`.
+    OpenCode must consume the provider-exported placeholder instead. The same
+    applies to the OpenAI and Anthropic OpenCode providers below.
 
 ```bash
 openshell provider profile lint -f provider-profiles/provider-opencode-openrouter.yaml

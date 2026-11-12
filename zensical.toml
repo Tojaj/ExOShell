@@ -18,7 +18,7 @@ nav = [
     { "Sessions and credentials" = "guide/sessions.md" },
   ] },
   { "Integrations" = [
-    { "Providers" = "integrations/index.md" },
+    { "Overview" = "integrations/index.md" },
     { "Inference providers" = "integrations/inference.md" },
     { "GitHub and GitLab" = "integrations/forges.md" },
     { "Opt-in package registries" = "integrations/registries.md" },
@@ -27,7 +27,7 @@ nav = [
     { "Tavily web search" = "integrations/web-search.md" },
   ] },
   { "Customize" = [
-    { "Customizing this project" = "customize/index.md" },
+    { "Overview" = "customize/index.md" },
     { "Custom images and CA trust" = "customize/images.md" },
     { "Create a custom policy" = "customize/policies.md" },
     { "Grant writes with policy overlays" = "customize/overlays.md" },
@@ -38,7 +38,7 @@ nav = [
     { "Troubleshooting" = "reference/troubleshooting.md" },
     { "Architecture" = "reference/architecture.md" },
     { "Acceptance checks" = "reference/acceptance.md" },
-    { "Upgrade ExOShell to OpenShell v0.1.5" = "upgrade-openshell-0.1.5.md" },
+    { "Upgrade ExOShell to OpenShell v0.1.5" = "reference/upgrade-openshell-0.1.5.md" },
     { "Specification" = "https://github.com/Tojaj/ExOShell/blob/main/SPEC.md" },
     { "Design decisions" = "https://github.com/Tojaj/ExOShell/tree/main/adrs" },
     { "Contributing" = "https://github.com/Tojaj/ExOShell/blob/main/CONTRIBUTING.md" },

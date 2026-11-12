@@ -92,18 +92,15 @@ shell scripts. Prefer `--from-existing` where the profile supports credential
 discovery; it reads the required environment value from the host shell and
 stores it through OpenShell.
 
-Future installation tooling must record the objects it creates. Uninstall must
-use that record and check modifications and dependencies; names and origin
-annotations alone are insufficient grounds for deletion.
-
 ## Composition and policy
 
-Do not attach providers that export the same credential environment variable to
-the same sandbox. Common conflicts include Codex and OpenCode OpenAI providers
-(`OPENAI_API_KEY`), Claude Code and OpenCode Anthropic providers
-(`ANTHROPIC_API_KEY`), multiple GitHub providers, and multiple GitLab
-providers. Use separate sandboxes when switching between instances that share a
-credential environment.
+!!! warning "Never attach two providers that export the same variable"
+    Do not attach providers that export the same credential environment
+    variable to the same sandbox. Common conflicts include Codex and OpenCode
+    OpenAI providers (`OPENAI_API_KEY`), Claude Code and OpenCode Anthropic
+    providers (`ANTHROPIC_API_KEY`), multiple GitHub providers, and multiple
+    GitLab providers. Use separate sandboxes when switching between instances
+    that share a credential environment.
 
 Some source-control profiles require a matching GraphQL endpoint in the
 sandbox policy. Policy overlays can grant narrowly scoped writes without

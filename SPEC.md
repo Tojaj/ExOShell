@@ -187,7 +187,10 @@ Supplied profile IDs start with `exoshell-` and carry the `exoshell-origin:
 ExOShell` annotation. Suggested instance names drop a trailing `-cli`; registry
 profiles and suggested instances use `-ro` for consumption without publishing.
 The Codex fallback instance is `exoshell-codex`. Instance names remain configurable,
-and origin metadata does not establish installer ownership. See ADR-0031.
+and origin metadata does not establish installer ownership. Future installation
+tooling must record the objects it creates; uninstall must use that record and
+check modifications and dependencies, because names and origin annotations
+alone are insufficient grounds for deletion. See ADR-0031.
 
 GitHub and GitLab GraphQL endpoints are declared once per host in user policy,
 allowing network overlays to replace an entry when enabling writes. Provider

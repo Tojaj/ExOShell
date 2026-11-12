@@ -1,5 +1,8 @@
 # Acceptance checks
 
+This checklist is for maintainers and contributors validating a change to
+ExOShell itself; daily use needs none of it.
+
 For each agent, launch a sandbox and verify the working directory, `sandbox`
 user, host-owned writes below `/workspace`, and the agent-specific state paths.
 Then verify inference through each configured backend and GitHub/GitLab CLI

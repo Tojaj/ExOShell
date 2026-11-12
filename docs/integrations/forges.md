@@ -19,6 +19,11 @@ openshell provider profile lint -f provider-profiles/provider-github-cli.yaml
 openshell provider profile import -f provider-profiles/provider-github-cli.yaml
 ```
 
+The create command below reuses the token from an authenticated host `gh`
+(`gh auth status` must report github.com as logged in). Otherwise export a
+personal access token into `GITHUB_TOKEN` yourself, as in the GitLab block
+below.
+
 ```bash
 export GITHUB_TOKEN="$(gh auth token)"
 openshell provider create --name exoshell-github --type exoshell-github-cli --from-existing
@@ -70,9 +75,11 @@ GitHub profile. `glab` issue and merge-request commands use REST; GraphQL is
 used by `glab api graphql` and `glab workitems list`. See [ADR 9](https://github.com/Tojaj/ExOShell/blob/main/adrs/adr0009-gitlab-provider-graphql-in-user-policy.md).
 
 Configure `gitlab_host = "gitlab.com"` in `.exoshell.local.toml` when the
-launcher must select this host. Remove any equal-specificity GitLab.com audit
-entry from the active policy after attaching the provider, because it conflicts
-with the provider's enforce endpoint.
+launcher must select this host. If the active policy still has its own
+GitLab.com entry for the same host and port in `audit` mode, remove it after
+attaching the provider: two entries of equal specificity must agree on
+enforcement, and the provider's is `enforce`. See the
+[policy composition rules](../customize/policies.md#composition-rules).
 
 Smoke test inside a sandbox that attaches `exoshell-gitlab`:
 

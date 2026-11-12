@@ -18,7 +18,7 @@ internal infrastructure even when the file contains no credentials. Keep a
 site-specific policy outside a public branch when its endpoint inventory is
 sensitive.
 
-### Policy sections
+## Policy sections
 
 - `filesystem_policy` lists readable and writable container paths. Paths not
   admitted by the effective Landlock policy are inaccessible.
@@ -48,11 +48,15 @@ network_policies:
       - { path: /usr/local/bin/example-cli }
 ```
 
-Prefer `enforcement: enforce` for known behavior. `audit` is useful while
-discovering required endpoints, but it permits traffic and should not become a
-permanent substitute for scoped rules.
+!!! warning "`audit` permits the traffic it records"
+    Prefer `enforcement: enforce` for known behavior. `audit` is useful while
+    discovering required endpoints, but it allows the requests it logs and must
+    not become a permanent substitute for scoped rules.
 
-Important composition rules:
+## Composition rules
+
+A sandbox's effective policy combines this file with every attached provider
+profile. Those layers must not contradict each other:
 
 - Attached provider profiles add `_provider_*` entries to the effective
   policy. Do not duplicate those broad host entries in the user policy.
@@ -66,7 +70,7 @@ Important composition rules:
   inside the image with `command -v` and, for wrappers, inspect the resolved
   executable as well.
 
-### GraphQL endpoints
+## GraphQL endpoints
 
 The source-control profiles in this repository deliberately omit GraphQL
 endpoints. Declare each GraphQL endpoint exactly once in the user policy so a
@@ -108,7 +112,7 @@ network_policies:
 overlays for required mutations; do not add a second matching GraphQL endpoint.
 See [policy overlays](overlays.md) for this project's overlay workflow.
 
-### Iterate and verify
+## Iterate and verify
 
 Create a sandbox with the policy, inspect denied requests, and update only the
 required rules. Launch with `--keep` so the sandbox survives the agent exiting,

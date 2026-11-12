@@ -59,7 +59,8 @@ zensical build --clean --strict
 Open the local URL printed by `zensical serve`. Check light/dark mode, narrow
 screens, navigation, search, and code tabs when changing layout. Generated
 `site/` and `.cache/` content is ignored. Navigation is in `zensical.toml`;
-local page labels match their H1 headings, except the homepage's "Overview".
+local page labels match their H1 headings, except section index pages, which
+are labeled "Overview".
 
 The [Documentation workflow](.github/workflows/docs.yaml) validates pull
 requests and publishes pushes to `main` at <https://tojaj.github.io/ExOShell/>.

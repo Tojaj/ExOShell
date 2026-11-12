@@ -7,7 +7,7 @@ A provider instance stores the actual local credential for that type.
 Provider profile hosts are not parameterized when an instance is created. Make
 one profile YAML and one unique profile ID for each source-control host.
 
-### GitHub Enterprise profile
+## GitHub Enterprise profile
 
 Create `provider-profiles/provider-github-enterprise-cli.yaml` and replace the
 example hostname with the real GitHub Enterprise Server hostname:
@@ -70,7 +70,7 @@ and configures Git to use `gh auth git-credential`. This selects the CLI and Git
 host only; it does not replace the host-specific provider profile or GraphQL
 policy entry.
 
-### GitLab self-managed profile
+## GitLab self-managed profile
 
 Create `provider-profiles/provider-gitlab-enterprise-cli.yaml`:
 
@@ -131,7 +131,7 @@ HTTPS, and configures a Git credential helper that sends the provider-backed
 placeholder. The token-free `glab-config.yml` in the image registers the host
 without persisting its token.
 
-### Lint and import profiles
+## Lint and import profiles
 
 Lint each profile before importing it:
 
@@ -162,7 +162,7 @@ Updating a profile changes every provider instance of that type and reaches
 running sandboxes on their next configuration sync. OpenShell rejects an update
 that would make an attached sandbox's effective policy invalid.
 
-### Create provider instances
+## Create provider instances
 
 Load each token into the host environment only long enough to create its
 provider:

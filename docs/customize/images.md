@@ -91,7 +91,7 @@ For a remote gateway, push the image to a registry the gateway can access and
 use that fully qualified image reference. OpenShell does not build a Dockerfile
 passed to `--from`; build and tag the image first.
 
-### Shared agent instructions
+## Shared agent instructions
 
 The base image keeps operational guidance under `/etc/exoshell/instructions/`.
 At build time, it combines all top-level `*.md` files in filename order into
@@ -127,7 +127,7 @@ developer-level priority over project guidance. Claude's managed memory
 cannot be excluded through `claudeMdExcludes`, but remains behavioral guidance
 rather than technical enforcement.
 
-### Private CA for inspected Podman HTTPS egress
+## Private CA for inspected Podman HTTPS egress
 
 OpenShell v0.1.5 supports private CA trust in the stock Podman supervisor.
 Place an operator-owned PEM bundle at an absolute, gateway-readable path on the
@@ -154,10 +154,10 @@ Derived workload images can still install their own roots for build-time
 requests and clients that use the image's trust store. Keep private certificate
 sources and host paths in the customization repository or machine-local setup.
 See [ADR-0043](https://github.com/Tojaj/ExOShell/blob/main/adrs/adr0043-native-podman-additional-ca-bundle.md) and the
-[upgrade guide](../upgrade-openshell-0.1.5.md). `proxy_ca_bundle` remains the
+[upgrade guide](../reference/upgrade-openshell-0.1.5.md). `proxy_ca_bundle` remains the
 separate option for corporate forward proxies.
 
-### Image requirements
+## Image requirements
 
 - Run the workload as a non-root user. This project retains the community
   `sandbox` account and `/sandbox` home.
