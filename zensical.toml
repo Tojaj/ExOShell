@@ -28,8 +28,9 @@ nav = [
   ] },
   { "Customize" = [
     { "Customizing this project" = "customize/index.md" },
-    { "Create a custom image" = "customize/images.md" },
+    { "Custom images and CA trust" = "customize/images.md" },
     { "Create a custom policy" = "customize/policies.md" },
+    { "Grant writes with policy overlays" = "customize/overlays.md" },
     { "Create custom source-control providers" = "customize/providers.md" },
   ] },
   { "Reference" = [

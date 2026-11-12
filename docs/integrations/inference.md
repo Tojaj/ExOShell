@@ -1,5 +1,8 @@
 # Inference providers
 
+*Run these commands on the gateway host, from your ExOShell checkout: the paths
+are relative to it. Blocks marked as sandbox commands run inside a sandbox.*
+
 ## Codex CLI
 
 `exoshell-codex-cli` runs Codex with an OpenAI API key, rather than ChatGPT OAuth. It

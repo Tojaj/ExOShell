@@ -1,5 +1,8 @@
 # Tavily web search
 
+*Run these commands on the gateway host, from your ExOShell checkout: the paths
+are relative to it. Blocks marked as sandbox commands run inside a sandbox.*
+
 `exoshell-tavily-search` supplies a Bearer API key to the Tavily search API
 for Codex, Claude Code, and OpenCode sandboxes. Tavily fetches upstream
 sources server-side and returns their content in the API response, so the
@@ -49,6 +52,7 @@ Smoke test inside a sandbox that attaches `exoshell-tavily-search` (the
 output must not contain the readable key):
 
 ```bash
+# inside the sandbox
 curl --fail --silent --show-error https://api.tavily.com/search \
   -H "Content-Type: application/json" \
   -d '{"query":"OpenShell sandbox providers","max_results":1}'

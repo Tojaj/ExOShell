@@ -106,27 +106,42 @@ network_policies:
 
 `read-only` permits GraphQL queries, not mutations. Add narrowly scoped policy
 overlays for required mutations; do not add a second matching GraphQL endpoint.
-See [`policy-overlays/README.md`](https://github.com/Tojaj/ExOShell/blob/main/policy-overlays/README.md) for this project's
-overlay workflow.
+See [policy overlays](overlays.md) for this project's overlay workflow.
 
 ### Iterate and verify
 
 Create a sandbox with the policy, inspect denied requests, and update only the
-required rules:
+required rules. Launch with `--keep` so the sandbox survives the agent exiting,
+because the default lifecycle deletes it along with its logs:
 
 ```bash
-./run-exoshell-agent.sh --policy policies/policy-local.yaml .
-openshell logs codex --tail --source sandbox
-openshell policy get codex --full
+./run-exoshell-agent.sh --keep --policy policies/policy-local.yaml .
+```
+
+OpenShell assigns the sandbox name, so look it up after the launch and use it in
+the inspection commands:
+
+```bash
+openshell sandbox list --selector managed-by=exoshell
+openshell logs <sandbox-name> --tail --source sandbox
+openshell policy get <sandbox-name> --full
 ```
 
 For a running sandbox, network-only changes can be applied without recreation:
 
 ```bash
-openshell policy get codex --base > /tmp/current-policy.yaml
+openshell policy get <sandbox-name> --base > /tmp/current-policy.yaml
 # Remove the metadata header above the YAML document marker before reuse.
-openshell policy set codex --policy /tmp/current-policy.yaml --wait
+openshell policy set <sandbox-name> --policy /tmp/current-policy.yaml --wait
 ```
 
 Recreate the sandbox after changing static policy sections or after adding the
-first `protocol: tcp` endpoint.
+first `protocol: tcp` endpoint. Delete each retained sandbox when the
+investigation is finished:
+
+```bash
+openshell sandbox delete <sandbox-name>
+```
+
+To grant a capability temporarily on a running sandbox instead of editing the
+baseline, see [policy overlays](overlays.md).

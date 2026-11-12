@@ -1,9 +1,14 @@
-# Create a custom image
+# Custom images and CA trust
 
 Start with [`sandboxes/exoshell-base`](https://github.com/Tojaj/ExOShell/tree/main/sandboxes/exoshell-base), which extends the
 OpenShell community image with the agents and CLIs expected by this project.
 Create another layer when you need organization-specific trust roots, extra
 tools, or non-secret client configuration.
+
+Trusting a private certificate authority for inspected HTTPS egress is
+configured on the gateway host rather than in an image. That setting is
+documented on this page under
+[private CA for inspected Podman HTTPS egress](#private-ca-for-inspected-podman-https-egress).
 
 For example:
 

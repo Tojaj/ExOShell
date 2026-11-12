@@ -1,5 +1,8 @@
 # Google Workspace OAuth
 
+*Run these commands on the gateway host, from your ExOShell checkout: the paths
+are relative to it. Blocks marked as sandbox commands run inside a sandbox.*
+
 `exoshell-gws-cli` provides OAuth credentials to the Google Workspace CLI. The
 sandbox receives placeholders for the client ID, client secret, and refresh
 token; OpenShell substitutes the secret values only in OAuth token request
@@ -40,6 +43,7 @@ present. See [ADR 2](https://github.com/Tojaj/ExOShell/blob/main/adrs/adr0002-gw
 Smoke test inside a sandbox launched with `--provider exoshell-gws`:
 
 ```bash
+# inside the sandbox
 gws drive files list --params '{"pageSize":1,"fields":"files(id),nextPageToken"}'
 ```
 

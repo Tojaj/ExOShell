@@ -50,5 +50,5 @@ base image.
 ## References
 
 - [Launcher implementation](../scripts/exoshell_agent.py)
-- [Derived image configuration](../docs/customize/images.md#create-a-custom-image)
+- [Derived image configuration](../docs/customize/images.md)
 - [OpenCode configuration](https://opencode.ai/docs/config/)

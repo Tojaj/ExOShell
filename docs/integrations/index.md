@@ -5,6 +5,21 @@ permitted binaries. Provider instances store the local credentials for those
 profiles that require them. Import only the profiles and create only the
 instances needed on a machine.
 
+This page covers the rules that apply to every provider. For the setup steps of
+a specific service, go straight to its page:
+
+| Integration | Use it for |
+| --- | --- |
+| [Inference providers](inference.md) | The API key that runs Codex, Claude Code, or OpenCode |
+| [GitHub and GitLab](forges.md) | `gh`, `glab`, and Git over HTTPS |
+| [Opt-in package registries](registries.md) | npm, PyPI, Go, Cargo, APT, and container image downloads |
+| [Google Workspace OAuth](google-workspace.md) | The `gws` CLI |
+| [Atlassian Rovo MCP](atlassian.md) | Jira and Confluence through MCP |
+| [Tavily web search](web-search.md) | Agent web research |
+
+Run the commands on these pages **on the gateway host, from your ExOShell
+checkout**: they use paths relative to it, such as `provider-profiles/`.
+
 ## Names and origin
 
 ExOShell-supplied profile IDs start with `exoshell-`, display names start with
@@ -28,6 +43,7 @@ Instance names remain configurable.
 | `exoshell-opencode-anthropic` | `exoshell-opencode-anthropic` |
 | `exoshell-opencode-openrouter` | `exoshell-opencode-openrouter` |
 | `exoshell-atlassian-mcp` | `exoshell-atlassian-mcp` |
+| `exoshell-tavily-search` | `exoshell-tavily-search` |
 
 Registry profiles and suggested instances share the IDs in the [registry table](registries.md).
 Their `-ro` suffix means consumption without publishing, including npm's
@@ -90,9 +106,6 @@ providers. Use separate sandboxes when switching between instances that share a
 credential environment.
 
 Some source-control profiles require a matching GraphQL endpoint in the
-sandbox policy. Policy overrides can grant narrowly scoped writes without
-changing a profile. See [policy overlays](https://github.com/Tojaj/ExOShell/blob/main/policy-overlays/README.md) for the
-overlay workflow and [customization](../customize/index.md) for custom hosts.
-
-For integration-specific setup, see [Google Workspace](google-workspace.md)
-and [package registries](registries.md).
+sandbox policy. Policy overlays can grant narrowly scoped writes without
+changing a profile. See [policy overlays](../customize/overlays.md) for that
+workflow and [customization](../customize/index.md) for custom hosts.

@@ -1,5 +1,8 @@
 # Opt-in package registries
 
+*Run these commands on the gateway host, from your ExOShell checkout: the paths
+are relative to it. Blocks marked as sandbox commands run inside a sandbox.*
+
 Eight independent, credential-free profiles grant package or container image
 downloads and metadata lookups over HTTPS. Ubuntu APT also supports HTTP for
 stock source configurations. None is attached by default or grants publishing
@@ -158,9 +161,12 @@ profiles and client configuration; attaching this provider does not change
 APT sources.
 
 The binary list includes `apt`, `apt-get`, their resolved HTTP/HTTPS download
-helper, all three agents and `curl`. A read smoke test after attaching is:
+helper, all three agents and `curl`. Smoke-test the grant **inside a sandbox**
+that attaches the instance; the same command run on the host proves nothing,
+because the host has its own network access:
 
 ```bash
+# inside the sandbox
 curl --fail --silent --show-error --output /tmp/ubuntu-InRelease \
   http://archive.ubuntu.com/ubuntu/dists/noble/InRelease
 ```
@@ -205,6 +211,7 @@ the base and derived image layers, inspect a public image in a sandbox with the
 matching provider attached:
 
 ```bash
+# inside the sandbox
 # exoshell-dockerhub-registry-ro
 skopeo inspect docker://docker.io/library/alpine:latest
 oras manifest fetch docker.io/library/alpine:latest
@@ -218,9 +225,10 @@ skopeo inspect docker://ghcr.io/astral-sh/uv:0.12.22
 ```
 
 To verify layer downloads and CDN redirects, copy one of those images to a
-writable local OCI layout, for example:
+writable local OCI layout in the same sandbox, for example:
 
 ```bash
+# inside the sandbox
 skopeo copy docker://docker.io/library/alpine:latest oci:/tmp/alpine-smoke:latest
 ```
 

@@ -1,5 +1,8 @@
 # Atlassian Rovo MCP
 
+*Run these commands on the gateway host, from your ExOShell checkout: the paths
+are relative to it. Blocks marked as sandbox commands run inside a sandbox.*
+
 `exoshell-atlassian-mcp` supplies a short-lived OAuth 2.1 Bearer token to the Atlassian
 Rovo MCP endpoint used by the image-provided Codex, Claude Code, and OpenCode
 configurations. The refresh token remains on the host.
@@ -59,6 +62,7 @@ Atlassian rotates refresh tokens. See [ADR 17](https://github.com/Tojaj/ExOShell
 Smoke tests in a newly started sandbox:
 
 ```bash
+# inside the sandbox
 # Codex
 exoshell-agent "$PWD" -- codex mcp list
 

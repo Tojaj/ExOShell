@@ -30,10 +30,11 @@ The portable baseline **audits general network traffic**; provider endpoints
 **enforce** credential and request boundaries. It is not a blanket network deny
 policy. See [policies](customize/policies.md) to tailor access.
 
-An agent can modify the project you share. Credentials in an explicitly mounted
-kubeconfig remain readable, and interactive login flows can write readable
-credentials inside the sandbox. Use the documented provider integrations and
-read [sessions and credentials](guide/sessions.md) before adding services.
+An agent can modify the project you share. Credentials in an
+[explicitly mounted kubeconfig](guide/workspaces.md#mount-a-kubeconfig) remain
+readable, and interactive login flows can write readable credentials inside the
+sandbox. Use the documented provider integrations and read
+[sessions and credentials](guide/sessions.md) before adding services.
 
 ## Find your next step
 

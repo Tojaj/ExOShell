@@ -9,11 +9,12 @@ The main extension points are:
 
 | Need | Extension point |
 |---|---|
-| Additional CLIs, workload CA certificates, or managed agent defaults | Derived sandbox image |
-| Private CA for inspected Podman HTTPS egress | Gateway host PEM file and Podman `additional_ca_bundle` |
-| Filesystem and network access | Sandbox policy |
-| Credential injection and provider-owned endpoint access | Provider profile and provider instance |
-| Machine paths, selected image, policy, providers, and starting model/effort | `.exoshell.local.toml` |
+| Additional CLIs, workload CA certificates, or managed agent defaults | [Derived sandbox image](images.md) |
+| Private CA for inspected Podman HTTPS egress | [Gateway host PEM file and Podman `additional_ca_bundle`](images.md#private-ca-for-inspected-podman-https-egress) |
+| Filesystem and network access | [Sandbox policy](policies.md) |
+| A temporary extra capability, such as opening a pull request | [Policy overlay](overlays.md) |
+| Credential injection and provider-owned endpoint access | [Provider profile and provider instance](providers.md) |
+| Machine paths, selected image, policy, providers, and starting model/effort | [`.exoshell.local.toml`](../guide/configuration.md) |
 
 Use reserved example domains such as `github.example.com` and
 `gitlab.example.com` while preparing changes for publication. Never commit
@@ -39,7 +40,7 @@ current customization repository:
 
 TOML file paths resolve relative to that file, so `policy =
 "policies/policy-local.yaml"` can stay within the customization repository.
-The overlay helper uses the sandbox's recorded policy source for `--revert`.
+The [overlay helper](overlays.md) uses the sandbox's recorded policy source for `--revert`.
 Supply `--base-file` to override it or for an unannotated sandbox. The annotation
 is an absolute path on the launching host, so another host needs its own
 explicit baseline. It records provenance, not a copy of the file.

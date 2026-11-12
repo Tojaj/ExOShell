@@ -1,5 +1,8 @@
 # GitHub and GitLab
 
+*Run these commands on the gateway host, from your ExOShell checkout: the paths
+are relative to it. Blocks marked as sandbox commands run inside a sandbox.*
+
 ## GitHub CLI
 
 `exoshell-github-cli` supplies `GITHUB_TOKEN` and `GH_TOKEN` to `gh` and Git-over-HTTPS
@@ -30,6 +33,7 @@ could only narrow such an override. See [ADR 1](https://github.com/Tojaj/ExOShel
 Smoke test inside a sandbox that attaches `exoshell-github`:
 
 ```bash
+# inside the sandbox
 gh repo list
 gh auth status --hostname github.com
 git ls-remote https://github.com/<owner>/<repository>.git
@@ -73,6 +77,15 @@ with the provider's enforce endpoint.
 Smoke test inside a sandbox that attaches `exoshell-gitlab`:
 
 ```bash
+# inside the sandbox
 glab auth status --hostname gitlab.com
 git ls-remote https://gitlab.com/<namespace>/<project>.git
 ```
+
+## Allow writes for a session
+
+Both profiles are read-only at baseline: API queries, clone, and fetch work,
+while issue and pull/merge-request writes and `git push` are denied. To let an
+agent open a pull request or push a branch, apply a
+[policy overlay](../customize/overlays.md) to the running sandbox and revert it
+when the task is done.
