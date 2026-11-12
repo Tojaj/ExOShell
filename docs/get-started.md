@@ -4,7 +4,8 @@ This guide takes you from a Linux host to your first disposable agent session.
 Run these commands **on the gateway host** — the machine running the OpenShell
 gateway, which on a single-machine setup is the Linux box in front of you — and
 from your ExOShell checkout unless stated otherwise. The gateway creates and
-supervises *sandboxes*: the disposable containers your agent runs in.
+supervises *sandboxes*: the disposable containers your agent runs in. The
+[glossary](glossary.md) defines the rest of the vocabulary used across this site.
 
 ## 1. Prepare the host
 

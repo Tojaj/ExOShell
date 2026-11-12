@@ -45,4 +45,5 @@ sandbox. Use the documented provider integrations and read
 | Add GitHub, GitLab, packages, or MCP | [Integrations](integrations/index.md) |
 | Use private infrastructure or extra tools | [Customize](customize/index.md) |
 | Understand how it fits together | [Architecture](reference/architecture.md) |
+| Look up a term | [Glossary](glossary.md) |
 | Diagnose a failed launch or request | [Troubleshooting](reference/troubleshooting.md) |

@@ -37,6 +37,7 @@ nav = [
     { "Launcher options" = "reference/launcher.md" },
     { "Troubleshooting" = "reference/troubleshooting.md" },
     { "Architecture" = "reference/architecture.md" },
+    { "Glossary" = "glossary.md" },
     { "Acceptance checks" = "reference/acceptance.md" },
     { "Upgrade ExOShell to OpenShell v0.1.5" = "reference/upgrade-openshell-0.1.5.md" },
     { "Specification" = "https://github.com/Tojaj/ExOShell/blob/main/SPEC.md" },
