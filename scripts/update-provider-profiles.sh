@@ -4,7 +4,7 @@
 # Profile import is create-only, so updating means: export the live profile,
 # copy this repository's description/endpoints/binaries over it (keeping
 # resource_version and other deployment metadata), lint, and update.
-# See providers.md "For profiles already imported on the host".
+# See docs/integrations/registries.md "For profiles already imported on the host".
 #
 # Run from the repository root on the host (needs the `openshell` CLI and
 # python3 with PyYAML — not inside the sandbox):

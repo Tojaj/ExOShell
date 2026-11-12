@@ -2,7 +2,7 @@
 
 ExOShell provides reusable NVIDIA OpenShell provider profiles, sandbox policies,
 images, and a launcher for coding agents. Read SPEC.md for the implemented
-behavior and CUSTOMIZATION.md for extension points.
+behavior and [the customization guide](docs/customize/index.md) for extension points.
 
 ## Environment and discovery
 

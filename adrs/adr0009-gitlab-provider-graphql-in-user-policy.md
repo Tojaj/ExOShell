@@ -145,7 +145,7 @@ the audit/enforce overlap that `ambiguity.rs` rejects.
 ## References
 
 - [`provider-profiles/provider-gitlab-cli.yaml`](../provider-profiles/provider-gitlab-cli.yaml) — the custom profile (gitlab.com)
-- [`providers.md`](../docs/integrations/index.md) — provider setup and multi-instance guide
+- [Provider documentation](../docs/integrations/index.md) — provider setup and multi-instance guide
 - [`policy.yaml`](../policies/policy.yaml) — portable baseline policy with `gitlab_com_graphql` entry
 - [`policy-overlays/apply.py`](../policy-overlays/apply.py) — overlay script with per-host GraphQL invariant
 - [ADR 1](adr0001-graphql-endpoint-declared-once-in-user-policy.md) — the GitHub GraphQL-in-user-policy decision this extends

@@ -94,21 +94,5 @@ sandbox policy. Policy overrides can grant narrowly scoped writes without
 changing a profile. See [policy overlays](https://github.com/Tojaj/ExOShell/blob/main/policy-overlays/README.md) for the
 overlay workflow and [customization](../customize/index.md) for custom hosts.
 
-## Startup and package access
-
-GWS initialization is automatic when an attached provider supplies non-empty
-`GWS_CLIENT_ID`, `GWS_CLIENT_SECRET`, and `GWS_REFRESH_TOKEN` values. Remove
-the former `gws` key from local TOML files and `--gws`/`--no-gws` from launcher
-commands; these options are no longer accepted. Omit the GWS provider to skip
-provider-backed initialization. The launcher always mounts `/tmp/gws` as tmpfs
-so a provider can also be attached later, followed by a fresh helper launch.
-
-Do not attach inference providers that export the same variable to one
-sandbox—for example the Codex OpenAI and OpenCode OpenAI profiles both export
-`OPENAI_API_KEY`.
-
-Public npm, PyPI, Go module, and Cargo registry access is opt-in through
-independent, credential-free [package registry providers](registries.md#opt-in-package-registries).
-In particular, `uvx`/pip dependency downloads (including Python MCP server
-installation) require the `exoshell-pypi-packages-ro` instance; merely having uv in
-the image does not grant PyPI access.
+For integration-specific setup, see [Google Workspace](google-workspace.md)
+and [package registries](registries.md).

@@ -9,9 +9,15 @@ its proxy-aware refresh path. The profile covers both.
 
 Do not mount the host GWS configuration into the sandbox. When using this
 provider, the image helper automatically writes placeholder credentials into
-the launcher's `/tmp/gws` tmpfs when all three credential environment values
-are non-empty. A partial set fails startup; an absent set skips initialization.
+the launcher's `/tmp/gws` tmpfs when `GWS_CLIENT_ID`, `GWS_CLIENT_SECRET`, and
+`GWS_REFRESH_TOKEN` are all non-empty. A partial set fails startup; an absent
+set skips initialization. Omit the GWS provider to skip provider-backed setup.
+The launcher always mounts this tmpfs, so a provider can also be attached later,
+followed by a fresh process environment and helper launch.
 Refresh or replace the provider after reauthorizing on the host with changed scopes.
+
+Remove the former `gws` key from local TOML files and `--gws`/`--no-gws` from
+launcher commands; these options are no longer accepted.
 
 ```bash
 openshell provider profile lint -f provider-profiles/provider-gws-cli.yaml

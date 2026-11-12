@@ -20,6 +20,10 @@ All eight allow GET/HEAD/OPTIONS; npm alone also allows POST to
 `/-/npm/v1/security/advisories/bulk` and `/-/npm/v1/security/audits/quick`.
 Publishing, login, and unrelated POST/PUT/PATCH/DELETE requests are not granted.
 
+`uvx`/pip dependency downloads from PyPI, including Python MCP server
+installation, require the `exoshell-pypi-packages-ro` instance. Having uv in
+the image does not grant PyPI access.
+
 Import and create only the ecosystems needed by a project. For each desired
 name below (for example `exoshell-npm-registry-ro`), run:
 

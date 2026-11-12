@@ -25,11 +25,14 @@ agent CLIs and supporting tools. A machine-local ownership layer remaps its
 
 The Podman gateway must enable bind mounts and caller-supplied driver config.
 The documented setup disables resource admission and uses `userns = "keep-id"`;
-operators must trust gateway users to select host paths. See README.md and
-ADR-0025. Private trust roots and extra client defaults belong in derived images.
+operators must trust gateway users to select host paths. See
+[gateway setup](docs/get-started.md#2-configure-the-gateway) and ADR-0025.
+Private trust roots and extra client defaults belong in derived images.
 OpenShell v0.1.5 or newer is required. Inspected egress uses a separate
 supervisor container; private CA trust uses the Podman driver's
-`additional_ca_bundle`. CUSTOMIZATION.md and ADR-0043 document its configuration.
+`additional_ca_bundle`. The
+[private CA guide](docs/customize/images.md#private-ca-for-inspected-podman-https-egress)
+and ADR-0043 document its configuration.
 
 Shared operational guidance lives in the base image's `agent-instructions/`
 and is installed under `/etc/exoshell/instructions/`. The build combines the
@@ -39,7 +42,9 @@ OpenCode's global configuration lists the individual installed files. This
 guidance applies to direct agent launches and requires an image rebuild to
 change. Higher-precedence Codex configuration can replace the combined value;
 Claude managed memory is behavioral guidance rather than enforcement. See
-ADR-0032 and CUSTOMIZATION.md for derived-image regeneration.
+ADR-0032 and the
+[shared agent instructions guide](docs/customize/images.md#shared-agent-instructions)
+for derived-image regeneration.
 
 ## 3. Launcher and filesystem
 
@@ -138,7 +143,8 @@ Interactive OpenCode startup merges that selection into the built-in `build` and
 configuration and MCP state. Custom agents retain their own model
 configuration. `opencode run` receives `--model` after the subcommand instead
 (the TUI accepts no `--model` flag). These are starting selections
-that users can change during a session. See ADR-0036, ADR-0040, and CUSTOMIZATION.md.
+that users can change during a session. See ADR-0036, ADR-0040, and the
+[model and effort guide](docs/guide/models.md).
 
 The CLI-only `-v` / `--verbose` flag reports the absolute selected configuration
 path before loading it, or identifies built-in defaults when no file is selected.
@@ -168,8 +174,8 @@ See ADR-0035.
 
 Providers define credential bindings and endpoint rules independently of
 filesystem grants. Import and create only the providers needed for a session;
-providers.md documents the supported profiles. Avoid attaching profiles with
-conflicting credential environment variables.
+[provider documentation](docs/integrations/index.md) describes the supported
+profiles. Avoid attaching profiles with conflicting credential environment variables.
 
 Inference profiles and the baseline `opencode.ai` endpoint use OpenShell's
 native body classification. Unknown literals and valid issued placeholders are
