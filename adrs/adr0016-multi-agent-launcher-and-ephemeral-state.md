@@ -44,6 +44,6 @@ will not be used.
 
 - [Generic launcher](../run-exoshell-agent.sh)
 - [Launcher implementation](../scripts/exoshell_agent.py)
-- [Provider setup](../providers.md)
+- [Provider setup](../docs/integrations/index.md)
 - [OpenCode providers](https://opencode.ai/docs/providers)
 - [OpenCode managed configuration](https://opencode.ai/docs/config/#managed-settings)

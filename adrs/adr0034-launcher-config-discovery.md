@@ -51,5 +51,5 @@ helper fallback with per-sandbox source annotations and explicit overrides.
 
 - [XDG Base Directory Specification](https://specifications.freedesktop.org/basedir/)
 - [Launcher](../scripts/exoshell_agent.py)
-- [Customization guidance](../CUSTOMIZATION.md)
+- [Customization guidance](../docs/customize/index.md)
 - [ADR-0016: multi-agent launcher](adr0016-multi-agent-launcher-and-ephemeral-state.md)

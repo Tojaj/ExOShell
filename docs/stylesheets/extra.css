@@ -1,0 +1,18 @@
+/* Keep the existing wordmark legible in either color scheme. */
+.exoshell-brand {
+  display: block;
+  width: min(100%, 430px);
+  margin-block: 1rem 2rem;
+}
+
+.exoshell-brand--dark {
+  display: none;
+}
+
+[data-md-color-scheme="slate"] .exoshell-brand--light {
+  display: none;
+}
+
+[data-md-color-scheme="slate"] .exoshell-brand--dark {
+  display: block;
+}

@@ -1,0 +1,86 @@
+[project]
+site_name = "ExOShell"
+site_description = "Coding agents in disposable NVIDIA OpenShell sandboxes."
+site_url = "https://tojaj.github.io/ExOShell/"
+repo_url = "https://github.com/Tojaj/ExOShell"
+repo_name = "Tojaj/ExOShell"
+edit_uri = "edit/main/docs/"
+extra_css = ["stylesheets/extra.css"]
+nav = [
+  { "Overview" = "index.md" },
+  { "Get started" = "get-started.md" },
+  { "Daily use" = [
+    { "Run an agent" = "guide/run-an-agent.md" },
+    { "Projects and workspaces" = "guide/workspaces.md" },
+    { "Configuration" = "guide/configuration.md" },
+    { "Models and effort" = "guide/models.md" },
+    { "User skills" = "guide/skills.md" },
+    { "Sessions and credentials" = "guide/sessions.md" },
+  ] },
+  { "Integrations" = [
+    { "Providers" = "integrations/index.md" },
+    { "Inference" = "integrations/inference.md" },
+    { "GitHub and GitLab" = "integrations/forges.md" },
+    { "Package registries" = "integrations/registries.md" },
+    { "Google Workspace" = "integrations/google-workspace.md" },
+    { "Atlassian MCP" = "integrations/atlassian.md" },
+    { "Web search" = "integrations/web-search.md" },
+  ] },
+  { "Customize" = [
+    { "Extension points" = "customize/index.md" },
+    { "Images and CA trust" = "customize/images.md" },
+    { "Policies" = "customize/policies.md" },
+    { "Provider profiles" = "customize/providers.md" },
+  ] },
+  { "Reference" = [
+    { "Launcher options" = "reference/launcher.md" },
+    { "Troubleshooting" = "reference/troubleshooting.md" },
+    { "Architecture" = "reference/architecture.md" },
+    { "Acceptance checks" = "reference/acceptance.md" },
+    { "Upgrade to OpenShell 0.1.5" = "upgrade-openshell-0.1.5.md" },
+    { "Specification" = "https://github.com/Tojaj/ExOShell/blob/main/SPEC.md" },
+    { "Design decisions" = "https://github.com/Tojaj/ExOShell/tree/main/adrs" },
+    { "Contributing" = "https://github.com/Tojaj/ExOShell/blob/main/CONTRIBUTING.md" },
+  ] },
+]
+
+[project.theme]
+language = "en"
+features = [
+  "content.action.edit", "content.code.copy", "content.tabs.link",
+  "navigation.indexes", "navigation.sections", "navigation.tabs",
+  "navigation.top", "navigation.footer", "search.highlight",
+]
+
+[project.theme.icon]
+logo = "lucide/terminal"
+
+[project.theme.font]
+text = "Inter"
+code = "JetBrains Mono"
+
+[[project.theme.palette]]
+media = "(prefers-color-scheme: light)"
+scheme = "default"
+primary = "teal"
+accent = "teal"
+toggle.icon = "lucide/moon"
+toggle.name = "Switch to dark mode"
+
+[[project.theme.palette]]
+media = "(prefers-color-scheme: dark)"
+scheme = "slate"
+primary = "teal"
+accent = "teal"
+toggle.icon = "lucide/sun"
+toggle.name = "Switch to light mode"
+
+[project.markdown_extensions]
+admonition = {}
+attr_list = {}
+md_in_html = {}
+toc.permalink = true
+pymdownx.details = {}
+pymdownx.highlight = { anchor_linenums = true }
+pymdownx.superfences = { custom_fences = [ { name = "mermaid", class = "mermaid", format = "pymdownx.superfences.fence_code_format" } ] }
+pymdownx.tabbed = { alternate_style = true }

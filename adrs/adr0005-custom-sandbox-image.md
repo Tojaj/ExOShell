@@ -52,6 +52,6 @@ This is the only approach that gives a reproducible, fast-starting sandbox with 
 
 ## References
 
-- [`sandboxes/exoshell-base/`](../sandboxes/exoshell-base/) — image definition directory
+- [`sandboxes/exoshell-base/`](../sandboxes/exoshell-base) — image definition directory
 - [`policy.yaml`](../policies/policy.yaml) — portable sandbox policy with `binaries:` allowlist
 - [`SPEC.md`](../SPEC.md) — current generic image and ownership requirements

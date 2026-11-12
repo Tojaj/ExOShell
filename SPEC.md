@@ -1,7 +1,8 @@
 # ExOShell specification
 
 Status: implemented baseline. This document describes the generic project;
-README.md covers setup and CUSTOMIZATION.md covers site-specific extensions.
+[the setup guide](docs/get-started.md) covers first use and
+[customization](docs/customize/index.md) covers site-specific extensions.
 
 ## 1. Purpose and security goals
 
@@ -254,4 +255,4 @@ launcher logic is required. See ADR-0027.
 Run `python3 -m unittest discover -s tests -v` and the version-check skill tests.
 Lint profiles and policies using the installed OpenShell CLI. On a capable
 host, build the images and perform the identity, filesystem, inference, forge,
-and lifecycle smoke checks described in README.md and CUSTOMIZATION.md.
+and lifecycle smoke checks described in [acceptance checks](docs/reference/acceptance.md).

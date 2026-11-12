@@ -40,6 +40,33 @@ their required clients are unavailable. Omit it to require zero skips.
 See the [CI workflow](.github/workflows/ci.yaml) for hosted checks and
 [ADR-0045](adrs/adr0045-unprivileged-first-phase-ci.md) for CI design decisions.
 
+## Documentation
+
+User guides live in `docs/`; edit them there rather than duplicating setup in
+the README or the legacy provider/customization entry points. Keep the
+specification and ADRs in the repository. Use relative links within `docs/`
+and full GitHub links for source files outside it.
+
+With a virtual environment active:
+
+```bash
+python -m pip install -r requirements-docs.txt
+zensical serve
+# Production validation (also runs on pull requests):
+zensical build --clean --strict
+```
+
+Open the local URL printed by `zensical serve`. Check light/dark mode, narrow
+screens, navigation, search, and code tabs when changing layout. Generated
+`site/` and `.cache/` content is ignored. Navigation is in `zensical.toml`.
+
+The [Documentation workflow](.github/workflows/docs.yaml) validates pull
+requests and publishes pushes to `main` at <https://tojaj.github.io/ExOShell/>.
+For the initial publication, select **Settings → Pages → Build and deployment
+→ Source → GitHub Actions** in the GitHub repository, then run the workflow on
+`main` (or push a change). Forks must update `site_url` and repository links
+before publishing to their own Pages site. No custom domain is required.
+
 ## Commit messages
 
 - Use clear, descriptive commit messages following Conventional Commits, with
