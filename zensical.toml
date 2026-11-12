@@ -19,13 +19,13 @@ nav = [
   ] },
   { "Integrations" = [
     { "Overview" = "integrations/index.md" },
-    { "Update provider profiles" = "integrations/update-provider-profiles.md" },
     { "Inference providers" = "integrations/inference.md" },
     { "GitHub and GitLab" = "integrations/forges.md" },
     { "Opt-in package registries" = "integrations/registries.md" },
     { "Google Workspace OAuth" = "integrations/google-workspace.md" },
     { "Atlassian Rovo MCP" = "integrations/atlassian.md" },
     { "Tavily web search" = "integrations/web-search.md" },
+    { "Update provider profiles" = "integrations/update-provider-profiles.md" },
   ] },
   { "Customize" = [
     { "Overview" = "customize/index.md" },
