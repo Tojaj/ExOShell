@@ -19,7 +19,7 @@ Podman and Buildah accept both `Dockerfile` and `Containerfile` as the default b
 
 OpenShell's `sandbox create --from` implementation has two bugs that make `Containerfile` unusable today:
 
-1. **Directory lookup only finds `Dockerfile`.** When a directory is passed to `--from`, the CLI looks for `Dockerfile` exclusively; a `Containerfile` in the same directory is silently ignored with the error `No Dockerfile found in directory`.  
+1. **Directory lookup only finds `Dockerfile`.** When a directory is passed to `--from`, the CLI looks for `Dockerfile` exclusively; a `Containerfile` in the same directory is silently ignored with the error `No Dockerfile found in directory`.
    (Upstream: [#2420](https://github.com/NVIDIA/OpenShell/issues/2420) — open, stale)
 
 2. **Direct file path to `Containerfile` is rejected.** When a path like `sandboxes/exoshell-base/Containerfile` is passed directly, the CLI reports `local --from path is not a regular file or directory`, even though the file is a valid UTF-8 text file.

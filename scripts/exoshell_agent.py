@@ -6,7 +6,6 @@ from __future__ import annotations
 import argparse
 import json
 import os
-from pathlib import Path
 import re
 import shutil
 import stat
@@ -14,8 +13,9 @@ import subprocess
 import sys
 import tempfile
 import tomllib
-from typing import Any, Sequence
-
+from collections.abc import Sequence
+from pathlib import Path
+from typing import Any
 
 CONTAINER_WORKSPACE = "/workspace"
 CONTAINER_HOME = "/sandbox"
@@ -78,17 +78,23 @@ def parser(*, prog: str = "run-exoshell-agent.sh") -> argparse.ArgumentParser:
     result.add_argument("--agent", choices=AGENTS, help="coding agent (default: codex)")
     for key in ("model", "effort"):
         group = result.add_mutually_exclusive_group()
-        group.add_argument(f"--{key}", help=f"starting agent {key} (overrides per-agent config)")
         group.add_argument(
-            f"--no-{key}", action="store_true",
+            f"--{key}", help=f"starting agent {key} (overrides per-agent config)"
+        )
+        group.add_argument(
+            f"--no-{key}",
+            action="store_true",
             help=f"ignore the configured {key}; use native agent defaults",
         )
     result.add_argument(
-        "--config", type=Path,
+        "--config",
+        type=Path,
         help="TOML file (any filename; relative to caller's directory; bypasses discovery)",
     )
     result.add_argument(
-        "-v", "--verbose", action="store_true",
+        "-v",
+        "--verbose",
+        action="store_true",
         help="report the selected configuration file and effective settings on stderr",
     )
     result.add_argument("--image", help="sandbox OCI image")
@@ -97,44 +103,73 @@ def parser(*, prog: str = "run-exoshell-agent.sh") -> argparse.ArgumentParser:
         action="store_true",
         help="retain the sandbox after the agent exits (for debugging)",
     )
-    result.add_argument("--host-share", type=Path, help="host directory mounted at /workspace")
-    skills = result.add_mutually_exclusive_group()
-    skills.add_argument("--skill", action="append", dest="skills", metavar="PATH",
-                        help="skill or collection directory (repeatable; replaces configured skills)")
-    skills.add_argument("--no-skills", action="store_true", help="ignore configured skill sources")
     result.add_argument(
-        "--no-share", action="store_true",
+        "--host-share", type=Path, help="host directory mounted at /workspace"
+    )
+    skills = result.add_mutually_exclusive_group()
+    skills.add_argument(
+        "--skill",
+        action="append",
+        dest="skills",
+        metavar="PATH",
+        help="skill or collection directory (repeatable; replaces configured skills)",
+    )
+    skills.add_argument(
+        "--no-skills", action="store_true", help="ignore configured skill sources"
+    )
+    result.add_argument(
+        "--no-share",
+        action="store_true",
         help="use a disposable /workspace without host project or kubeconfig mounts",
     )
     providers = result.add_mutually_exclusive_group()
-    providers.add_argument("--provider", action="append", dest="providers", metavar="NAME")
+    providers.add_argument(
+        "--provider", action="append", dest="providers", metavar="NAME"
+    )
     providers.add_argument("--no-providers", action="store_true")
     policy = result.add_mutually_exclusive_group()
     policy.add_argument(
-        "--policy", type=Path,
+        "--policy",
+        type=Path,
         help="sandbox policy YAML file (required unless configured or --no-policy is supplied)",
     )
     policy.add_argument(
-        "--no-policy", action="store_true",
+        "--no-policy",
+        action="store_true",
         help="clear configured policy and let OpenShell select an environment, image, or default policy",
     )
     _nullable_path_option(result, "kubeconfig", "kubeconfig file")
     _nullable_host_option(result, "github", "GitHub")
     _nullable_host_option(result, "gitlab", "GitLab")
-    result.add_argument("project", nargs="?", type=Path, help="project directory (default: current directory)")
+    result.add_argument(
+        "project",
+        nargs="?",
+        type=Path,
+        help="project directory (default: current directory)",
+    )
     return result
 
 
-def _nullable_path_option(target: argparse.ArgumentParser, name: str, help_text: str) -> None:
+def _nullable_path_option(
+    target: argparse.ArgumentParser, name: str, help_text: str
+) -> None:
     group = target.add_mutually_exclusive_group()
     group.add_argument(f"--{name}", type=Path, help=help_text)
-    group.add_argument(f"--no-{name}", action="store_true", help=f"clear configured {name}")
+    group.add_argument(
+        f"--no-{name}", action="store_true", help=f"clear configured {name}"
+    )
 
 
-def _nullable_host_option(target: argparse.ArgumentParser, name: str, display_name: str) -> None:
+def _nullable_host_option(
+    target: argparse.ArgumentParser, name: str, display_name: str
+) -> None:
     group = target.add_mutually_exclusive_group()
     group.add_argument(f"--{name}-host", help=f"configure a {display_name} host")
-    group.add_argument(f"--no-{name}-host", action="store_true", help=f"disable {display_name} host configuration")
+    group.add_argument(
+        f"--no-{name}-host",
+        action="store_true",
+        help=f"disable {display_name} host configuration",
+    )
 
 
 def split_agent_args(argv: Sequence[str]) -> tuple[list[str], list[str]]:
@@ -152,8 +187,12 @@ def _resolve_path(value: str | Path, base: Path) -> Path:
 
 
 def _provider_list(value: Any, key: str) -> list[str]:
-    if not isinstance(value, list) or any(type(item) is not str or not item for item in value):
-        raise LauncherError(f"configuration key '{key}' must be an array of non-empty strings")
+    if not isinstance(value, list) or any(
+        type(item) is not str or not item for item in value
+    ):
+        raise LauncherError(
+            f"configuration key '{key}' must be an array of non-empty strings"
+        )
     _reject_duplicates(value, "provider")
     return value
 
@@ -164,7 +203,9 @@ def discover_config(explicit: Path | None, *, cwd: Path) -> Path | None:
         return _resolve_path(explicit, cwd)
 
     xdg_home = os.environ.get("XDG_CONFIG_HOME", "")
-    user_directory = Path(xdg_home) if Path(xdg_home).is_absolute() else Path.home() / ".config"
+    user_directory = (
+        Path(xdg_home) if Path(xdg_home).is_absolute() else Path.home() / ".config"
+    )
     candidates = (
         cwd / ".exoshell.local.toml",
         user_directory / "exoshell" / "exoshell.local.toml",
@@ -177,7 +218,9 @@ def discover_config(explicit: Path | None, *, cwd: Path) -> Path | None:
         except FileNotFoundError:
             continue
         except OSError as error:
-            raise LauncherError(f"cannot inspect configuration {candidate}: {error}") from error
+            raise LauncherError(
+                f"cannot inspect configuration {candidate}: {error}"
+            ) from error
         return candidate
     return None
 
@@ -205,8 +248,12 @@ def load_config(path: Path, *, required: bool) -> dict[str, Any]:
 
     for key, value in data.items():
         if key == "skills":
-            if not isinstance(value, list) or any(type(item) is not str or not item.strip() for item in value):
-                raise LauncherError("configuration key 'skills' must be an array of non-empty paths")
+            if not isinstance(value, list) or any(
+                type(item) is not str or not item.strip() for item in value
+            ):
+                raise LauncherError(
+                    "configuration key 'skills' must be an array of non-empty paths"
+                )
         elif key == "providers":
             _provider_list(value, key)
         elif key == "agents":
@@ -214,17 +261,25 @@ def load_config(path: Path, *, required: bool) -> dict[str, Any]:
                 raise LauncherError("configuration key 'agents' must be a table")
             unknown_agents = sorted(set(value) - AGENTS.keys())
             if unknown_agents:
-                raise LauncherError(f"unknown agent configuration(s): {', '.join(unknown_agents)}")
+                raise LauncherError(
+                    f"unknown agent configuration(s): {', '.join(unknown_agents)}"
+                )
             for agent, agent_config in value.items():
                 if not isinstance(agent_config, dict):
-                    raise LauncherError(f"configuration key 'agents.{agent}' must be a table")
-                unknown_agent_keys = sorted(set(agent_config) - {"providers", "model", "effort"})
+                    raise LauncherError(
+                        f"configuration key 'agents.{agent}' must be a table"
+                    )
+                unknown_agent_keys = sorted(
+                    set(agent_config) - {"providers", "model", "effort"}
+                )
                 if unknown_agent_keys:
                     raise LauncherError(
                         f"unknown configuration key(s) for agents.{agent}: {', '.join(unknown_agent_keys)}"
                     )
                 if "providers" in agent_config:
-                    _provider_list(agent_config["providers"], f"agents.{agent}.providers")
+                    _provider_list(
+                        agent_config["providers"], f"agents.{agent}.providers"
+                    )
                 for setting in ("model", "effort"):
                     if setting in agent_config:
                         selected = agent_config[setting]
@@ -234,7 +289,9 @@ def load_config(path: Path, *, required: bool) -> dict[str, Any]:
                             )
         elif key == "agent":
             if type(value) is not str or value not in AGENTS:
-                raise LauncherError(f"configuration key 'agent' must be one of: {', '.join(AGENTS)}")
+                raise LauncherError(
+                    f"configuration key 'agent' must be one of: {', '.join(AGENTS)}"
+                )
         elif type(value) is not str or not value:
             raise LauncherError(f"configuration key '{key}' must be a non-empty string")
 
@@ -256,13 +313,16 @@ def _reject_duplicates(values: Sequence[str], label: str) -> None:
         raise LauncherError(f"duplicate {label}(s): {', '.join(duplicates)}")
 
 
-def resolve_settings(args: argparse.Namespace, config: dict[str, Any], *, cwd: Path) -> dict[str, Any]:
+def resolve_settings(
+    args: argparse.Namespace, config: dict[str, Any], *, cwd: Path
+) -> dict[str, Any]:
     """Merge defaults, configuration, and CLI overrides into validated settings."""
     settings = {**DEFAULTS, **config}
     settings["no_share"] = args.no_share
     if args.no_share:
         for option, value in (
-            ("--host-share", args.host_share), ("--kubeconfig", args.kubeconfig),
+            ("--host-share", args.host_share),
+            ("--kubeconfig", args.kubeconfig),
             ("a positional project", args.project),
         ):
             if value is not None:
@@ -274,8 +334,10 @@ def resolve_settings(args: argparse.Namespace, config: dict[str, Any], *, cwd: P
         value = getattr(args, key)
         if value is not None and not value.strip():
             raise LauncherError(f"--{key} cannot be empty")
-        settings[key] = None if getattr(args, f"no_{key}") else (
-            value if value is not None else selected_agent.get(key)
+        settings[key] = (
+            None
+            if getattr(args, f"no_{key}")
+            else (value if value is not None else selected_agent.get(key))
         )
     if args.image is not None:
         if not args.image:
@@ -283,13 +345,17 @@ def resolve_settings(args: argparse.Namespace, config: dict[str, Any], *, cwd: P
         settings["image"] = args.image
     if args.keep:
         settings["keep"] = True
-    selected_skills = [] if args.no_skills else (
-        args.skills if args.skills is not None else settings["skills"]
+    selected_skills = (
+        []
+        if args.no_skills
+        else (args.skills if args.skills is not None else settings["skills"])
     )
     if any(not str(item).strip() for item in selected_skills):
         raise LauncherError("--skill cannot be empty")
     # Keep the final symlink's name: it may be a deliberate skill alias.
-    settings["skills"] = [Path(os.path.abspath(_resolve_path(item, cwd))) for item in selected_skills]
+    settings["skills"] = [
+        Path(os.path.abspath(_resolve_path(item, cwd))) for item in selected_skills
+    ]
 
     if args.host_share is not None:
         settings["host_share"] = _resolve_path(args.host_share, cwd)
@@ -324,20 +390,28 @@ def resolve_settings(args: argparse.Namespace, config: dict[str, Any], *, cwd: P
 
     if args.no_share:
         settings.update(
-            project=None, host_share=None, kubeconfig=None, container_project=CONTAINER_WORKSPACE,
+            project=None,
+            host_share=None,
+            kubeconfig=None,
+            container_project=CONTAINER_WORKSPACE,
         )
     else:
         project = _resolve_path(args.project or cwd, cwd)
         host_share = settings.get("host_share")
         settings["project"] = canonical_directory(project, "project")
         settings["host_share"] = canonical_directory(
-            _resolve_path(host_share, cwd) if host_share is not None else project, "host share"
+            _resolve_path(host_share, cwd) if host_share is not None else project,
+            "host share",
         )
         try:
             relative_project = settings["project"].relative_to(settings["host_share"])
         except ValueError as error:
-            raise LauncherError(f"project {settings['project']} is outside host share {settings['host_share']}") from error
-        settings["container_project"] = str(Path(CONTAINER_WORKSPACE) / relative_project)
+            raise LauncherError(
+                f"project {settings['project']} is outside host share {settings['host_share']}"
+            ) from error
+        settings["container_project"] = str(
+            Path(CONTAINER_WORKSPACE) / relative_project
+        )
 
     for key in ("policy", "kubeconfig"):
         value = settings[key]
@@ -390,7 +464,10 @@ def select_skills(sources: Sequence[Path]) -> dict[str, Path]:
             else:
                 candidates = []
                 for child in sorted(source.iterdir()):
-                    if stat.S_ISDIR(child.stat().st_mode) and (child / "SKILL.md").exists():
+                    if (
+                        stat.S_ISDIR(child.stat().st_mode)
+                        and (child / "SKILL.md").exists()
+                    ):
                         candidates.append(child)
             for skill in candidates:
                 if not (skill / "SKILL.md").is_file():
@@ -398,15 +475,18 @@ def select_skills(sources: Sequence[Path]) -> dict[str, Path]:
                 if not skill.name:
                     raise LauncherError(f"skill directory needs a name: {skill}")
                 if skill.name in selected:
-                    raise LauncherError(f"duplicate skill '{skill.name}': {selected[skill.name]} and {skill}")
+                    raise LauncherError(
+                        f"duplicate skill '{skill.name}': {selected[skill.name]} and {skill}"
+                    )
                 selected[skill.name] = skill
     except (OSError, RuntimeError) as error:
         raise LauncherError(f"cannot inspect skill sources: {error}") from error
     return selected
 
 
-def copy_skill_snapshot(source: Path, destination: Path,
-                        ancestors: frozenset[tuple[int, int]] = frozenset()) -> None:
+def copy_skill_snapshot(
+    source: Path, destination: Path, ancestors: frozenset[tuple[int, int]] = frozenset()
+) -> None:
     """Materialize links without following a directory cycle or copying special files."""
     try:
         metadata = source.stat()
@@ -416,7 +496,9 @@ def copy_skill_snapshot(source: Path, destination: Path,
                 raise LauncherError(f"skill directory cycle: {source}")
             destination.mkdir(mode=0o700)
             for child in sorted(source.iterdir()):
-                copy_skill_snapshot(child, destination / child.name, ancestors | {identity})
+                copy_skill_snapshot(
+                    child, destination / child.name, ancestors | {identity}
+                )
         elif stat.S_ISREG(metadata.st_mode):
             shutil.copyfile(source, destination)
             destination.chmod(0o600 | (metadata.st_mode & 0o111))
@@ -450,9 +532,15 @@ def mount_config(settings: dict[str, Any]) -> dict[str, Any]:
             }
         )
     if settings.get("skills_snapshot") is not None:
-        mounts.append({"type": "bind", "source": str(settings["skills_snapshot"]),
-                       "target": CONTAINER_SKILLS_SNAPSHOT, "read_only": True,
-                       "selinux_label": "shared"})
+        mounts.append(
+            {
+                "type": "bind",
+                "source": str(settings["skills_snapshot"]),
+                "target": CONTAINER_SKILLS_SNAPSHOT,
+                "read_only": True,
+                "selinux_label": "shared",
+            }
+        )
     # Provision storage even when GWS is attached after sandbox creation.
     mounts.append({"type": "tmpfs", "target": "/tmp/gws", "mode": 0o777})
     return {"podman": {"mounts": mounts}}
@@ -460,7 +548,11 @@ def mount_config(settings: dict[str, Any]) -> dict[str, Any]:
 
 def git_identity(project: Path | None) -> tuple[str | None, str | None]:
     """Read required project identity, or optional global identity without a project."""
-    command = ["git", "config", "--global"] if project is None else ["git", "-C", str(project), "config"]
+    command = (
+        ["git", "config", "--global"]
+        if project is None
+        else ["git", "-C", str(project), "config"]
+    )
     values: list[str] = []
     for key in ("user.name", "user.email"):
         try:
@@ -487,10 +579,14 @@ def git_identity(project: Path | None) -> tuple[str | None, str | None]:
     return values[0], values[1]
 
 
-def environment_args(settings: dict[str, Any], name: str | None, email: str | None) -> list[str]:
+def environment_args(
+    settings: dict[str, Any], name: str | None, email: str | None
+) -> list[str]:
     environment = ["UV_CACHE_DIR=/tmp/uv-cache"]
     if settings.get("opencode_defaults") is not None:
-        environment.append("EXOSHELL_OPENCODE_DEFAULTS=" + json.dumps(settings["opencode_defaults"]))
+        environment.append(
+            "EXOSHELL_OPENCODE_DEFAULTS=" + json.dumps(settings["opencode_defaults"])
+        )
     git_config: list[tuple[str, str]] = []
     if name is not None and email is not None:
         environment.extend(
@@ -509,7 +605,10 @@ def environment_args(settings: dict[str, Any], name: str | None, email: str | No
         environment.append(f"GH_HOST={host}")
         git_config.extend(
             [
-                (f"credential.https://{host}.helper", "!/usr/bin/gh auth git-credential"),
+                (
+                    f"credential.https://{host}.helper",
+                    "!/usr/bin/gh auth git-credential",
+                ),
                 (f"url.https://{host}/.insteadOf", f"git@{host}:"),
             ]
         )
@@ -518,13 +617,18 @@ def environment_args(settings: dict[str, Any], name: str | None, email: str | No
         environment.append(f"GITLAB_HOST={host}")
         git_config.extend(
             [
-                (f"credential.https://{host}.helper", '!f(){ echo username=oauth2; echo "password=$GITLAB_TOKEN"; };f'),
+                (
+                    f"credential.https://{host}.helper",
+                    '!f(){ echo username=oauth2; echo "password=$GITLAB_TOKEN"; };f',
+                ),
                 (f"url.https://{host}/.insteadOf", f"git@{host}:"),
             ]
         )
     environment.append(f"GIT_CONFIG_COUNT={len(git_config)}")
     for index, (key, value) in enumerate(git_config):
-        environment.extend([f"GIT_CONFIG_KEY_{index}={key}", f"GIT_CONFIG_VALUE_{index}={value}"])
+        environment.extend(
+            [f"GIT_CONFIG_KEY_{index}={key}", f"GIT_CONFIG_VALUE_{index}={value}"]
+        )
     result: list[str] = []
     for value in environment:
         result.extend(["--env", value])
@@ -540,7 +644,7 @@ def native_option(arguments: Sequence[str], *names: str) -> str | None:
             if argument == name:
                 return arguments[index + 1] if index + 1 < len(arguments) else ""
             if argument.startswith(name + "="):
-                return argument[len(name) + 1:]
+                return argument[len(name) + 1 :]
             if len(name) == 2 and argument.startswith(name) and len(argument) > 2:
                 return argument[2:]
     return None
@@ -549,9 +653,26 @@ def native_option(arguments: Sequence[str], *names: str) -> str | None:
 def opencode_run_index(arguments: Sequence[str]) -> int | None:
     """Locate run after native value options, without treating option values as commands."""
     value_options = {
-        "--server", "--session", "-s", "--prompt", "--model", "-m", "--agent",
-        "--format", "--file", "-f", "--title", "--dir", "--port", "--attach",
-        "--password", "-p", "--username", "-u", "--log-level", "--completions",
+        "--server",
+        "--session",
+        "-s",
+        "--prompt",
+        "--model",
+        "-m",
+        "--agent",
+        "--format",
+        "--file",
+        "-f",
+        "--title",
+        "--dir",
+        "--port",
+        "--attach",
+        "--password",
+        "-p",
+        "--username",
+        "-u",
+        "--log-level",
+        "--completions",
         "--replay-limit",
     }
     index = 0
@@ -568,7 +689,9 @@ def opencode_run_index(arguments: Sequence[str]) -> int | None:
     return None
 
 
-def agent_command(settings: dict[str, Any], arguments: Sequence[str]) -> tuple[list[str], dict[str, Any]]:
+def agent_command(
+    settings: dict[str, Any], arguments: Sequence[str]
+) -> tuple[list[str], dict[str, Any]]:
     """Translate launcher defaults without modifying forwarded arguments."""
     agent = settings["agent"]
     model, effort = settings.get("model"), settings.get("effort")
@@ -579,9 +702,16 @@ def agent_command(settings: dict[str, Any], arguments: Sequence[str]) -> tuple[l
     if agent == "codex":
         # Config overrides are repeatable and lower precedence than --model.
         if model is not None and native_model is None:
-            defaults.extend(["--config", "model=" + json.dumps(model, ensure_ascii=False)])
+            defaults.extend(
+                ["--config", "model=" + json.dumps(model, ensure_ascii=False)]
+            )
         if effort is not None:
-            defaults.extend(["--config", "model_reasoning_effort=" + json.dumps(effort, ensure_ascii=False)])
+            defaults.extend(
+                [
+                    "--config",
+                    "model_reasoning_effort=" + json.dumps(effort, ensure_ascii=False),
+                ]
+            )
     elif agent == "claude":
         for key, value in (("model", model), ("effort", effort)):
             if value is not None and native_option(arguments, f"--{key}") is None:
@@ -613,13 +743,19 @@ def agent_command(settings: dict[str, Any], arguments: Sequence[str]) -> tuple[l
                         "use provider/model without #variant or drop the effort setting"
                     )
                 return [
-                    "opencode", *arguments[:run_index + 1],
-                    "--model", f"{effective_model}#{effort}", *arguments[run_index + 1:],
+                    "opencode",
+                    *arguments[: run_index + 1],
+                    "--model",
+                    f"{effective_model}#{effort}",
+                    *arguments[run_index + 1 :],
                 ], environment_settings
             if model is not None and native_model is None:
                 return [
-                    "opencode", *arguments[:run_index + 1],
-                    "--model", model, *arguments[run_index + 1:],
+                    "opencode",
+                    *arguments[: run_index + 1],
+                    "--model",
+                    model,
+                    *arguments[run_index + 1 :],
                 ], environment_settings
         else:
             effective_model = native_model if native_model is not None else model
@@ -633,14 +769,20 @@ def agent_command(settings: dict[str, Any], arguments: Sequence[str]) -> tuple[l
                         "OpenCode effort cannot combine with a model variant; "
                         "use provider/model without #variant or drop the effort setting"
                     )
-                environment_settings["opencode_defaults"] = {"model": effective_model, "variant": effort}
+                environment_settings["opencode_defaults"] = {
+                    "model": effective_model,
+                    "variant": effort,
+                }
             elif model is not None:
                 environment_settings["opencode_defaults"] = {"model": model}
     return [AGENTS[agent]["executable"], *defaults, *arguments], environment_settings
 
 
 def create_command(
-    settings: dict[str, Any], agent_args: Sequence[str], name: str | None, email: str | None,
+    settings: dict[str, Any],
+    agent_args: Sequence[str],
+    name: str | None,
+    email: str | None,
 ) -> list[str]:
     """Build the complete OpenShell sandbox creation command."""
     command = ["openshell", "sandbox", "create", "--from", settings["image"]]
@@ -656,22 +798,39 @@ def create_command(
         command.extend(["--provider", provider])
     if settings["policy"] is not None:
         command.extend(["--policy", str(settings["policy"])])
-        command.extend(["--annotation", f"exoshell.policy-source-file={settings['policy']}"])
+        command.extend(
+            ["--annotation", f"exoshell.policy-source-file={settings['policy']}"]
+        )
     selected_command, environment_settings = agent_command(settings, agent_args)
     command.extend(environment_args(environment_settings, name, email))
     if settings.get("skills_snapshot") is not None:
-        command.extend(["--env", f"EXOSHELL_SKILLS_SNAPSHOT={CONTAINER_SKILLS_SNAPSHOT}"])
-    command.append("--driver-config-json=" + json.dumps(mount_config(settings), separators=(",", ":")))
+        command.extend(
+            ["--env", f"EXOSHELL_SKILLS_SNAPSHOT={CONTAINER_SKILLS_SNAPSHOT}"]
+        )
+    command.append(
+        "--driver-config-json="
+        + json.dumps(mount_config(settings), separators=(",", ":"))
+    )
     command.append("--")
     if settings.get("skills_snapshot") is not None:
         # Older images must fail rather than silently starting without imports.
-        command.extend(["/bin/sh", "-c",
-                        'if [ ! -f /etc/exoshell/skills-import-v1 ]; then '
-                        'echo "exoshell: image lacks skill import support; rebuild the sandbox image" >&2; '
-                        'exit 2; fi; exec "$@"', "exoshell-skills"])
+        command.extend(
+            [
+                "/bin/sh",
+                "-c",
+                (
+                    "if [ ! -f /etc/exoshell/skills-import-v1 ]; then "
+                    'echo "exoshell: image lacks skill import support; rebuild the sandbox image" >&2; '
+                    'exit 2; fi; exec "$@"'
+                ),
+                "exoshell-skills",
+            ]
+        )
     command.extend(
         [
-            "/usr/local/bin/exoshell-agent", settings["container_project"], "--",
+            "/usr/local/bin/exoshell-agent",
+            settings["container_project"],
+            "--",
             *selected_command,
         ]
     )
@@ -699,7 +858,9 @@ def run(argv: Sequence[str], *, cwd: Path) -> int:
         try:
             config_path = config_path.resolve(strict=False)
         except (OSError, RuntimeError) as error:
-            raise LauncherError(f"cannot resolve configuration {config_path}: {error}") from error
+            raise LauncherError(
+                f"cannot resolve configuration {config_path}: {error}"
+            ) from error
         if args.verbose:
             _verbose_value("config", config_path)
         config = load_config(config_path, required=True)
@@ -709,8 +870,21 @@ def run(argv: Sequence[str], *, cwd: Path) -> int:
     agent_command(settings, agent_args)  # Validate before image checks or provisioning.
     if args.verbose:
         for key in (
-            "agent", "model", "effort", "image", "providers", "policy", "kubeconfig", "github_host",
-            "gitlab_host", "keep", "no_share", "host_share", "project", "container_project", "skills",
+            "agent",
+            "model",
+            "effort",
+            "image",
+            "providers",
+            "policy",
+            "kubeconfig",
+            "github_host",
+            "gitlab_host",
+            "keep",
+            "no_share",
+            "host_share",
+            "project",
+            "container_project",
+            "skills",
         ):
             _verbose_value(key, settings[key])
     selected_skills = select_skills(settings["skills"])
@@ -727,16 +901,22 @@ def launch(settings: dict[str, Any], agent_args: Sequence[str]) -> int:
     """Check the image and launch while any skill snapshot remains alive."""
     if is_local_image(settings["image"]):
         try:
-            image_result = subprocess.run(["podman", "image", "exists", settings["image"]])
+            image_result = subprocess.run(
+                ["podman", "image", "exists", settings["image"]], check=False
+            )
         except FileNotFoundError as error:
-            raise LauncherError("podman is required to check a localhost image") from error
+            raise LauncherError(
+                "podman is required to check a localhost image"
+            ) from error
         if image_result.returncode:
             raise LauncherError(
                 f"local image is missing: {settings['image']} (build sandboxes/local-user first)"
             )
     name, email = git_identity(settings["project"])
     try:
-        return subprocess.run(create_command(settings, agent_args, name, email)).returncode
+        return subprocess.run(
+            create_command(settings, agent_args, name, email), check=False
+        ).returncode
     except FileNotFoundError as error:
         raise LauncherError("openshell command was not found") from error
 

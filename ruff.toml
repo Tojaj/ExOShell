@@ -1,0 +1,10 @@
+target-version = "py311"
+extend-include = ["sandboxes/exoshell-base/exoshell-agent"]
+
+[lint.per-file-ignores]
+# These image/skill helpers are deliberately invoked through Python.
+".agents/skills/bump-exoshell-base-versions/scripts/check_versions.py" = ["EXE001"]
+"sandboxes/exoshell-base/render-agent-instructions.py" = ["EXE001"]
+# Preserve the distinction between fixture scopes and nested assertion scopes.
+"tests/test_openshell_agent.py" = ["SIM117"]
+"tests/test_policy_overlays.py" = ["SIM117"]

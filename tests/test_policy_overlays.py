@@ -1,20 +1,19 @@
 from __future__ import annotations
 
-from pathlib import Path
 import json
 import os
 import subprocess
 import sys
 import tempfile
 import unittest
+from pathlib import Path
 from unittest import mock
 
 import yaml
 
-
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "policy-overlays"))
-import apply as policy_apply  # noqa: E402
+import apply as policy_apply
 
 
 def endpoint(host: str, path: str, **extra: object) -> dict[str, object]:
@@ -36,38 +35,69 @@ class OverlayResolutionTests(unittest.TestCase):
 class RevertBaselineTests(unittest.TestCase):
     def test_explicit_baseline_bypasses_metadata(self) -> None:
         with mock.patch.object(policy_apply.subprocess, "run") as execute:
-            self.assertEqual(policy_apply.revert_base_file("test", "policy.yaml"), Path("policy.yaml"))
+            self.assertEqual(
+                policy_apply.revert_base_file("test", "policy.yaml"),
+                Path("policy.yaml"),
+            )
             execute.assert_not_called()
 
     def test_annotation_records_a_source_not_a_snapshot(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             path = Path(temporary) / "baseline with spaces=one.yaml"
             path.write_text("network_policies: {first: {}}\n")
-            response = mock.Mock(returncode=0, stdout=json.dumps({
-                "annotations": {policy_apply.POLICY_SOURCE_ANNOTATION: str(path)},
-            }))
-            with mock.patch.object(policy_apply.subprocess, "run", return_value=response) as execute:
+            response = mock.Mock(
+                returncode=0,
+                stdout=json.dumps(
+                    {
+                        "annotations": {
+                            policy_apply.POLICY_SOURCE_ANNOTATION: str(path)
+                        },
+                    }
+                ),
+            )
+            with mock.patch.object(
+                policy_apply.subprocess, "run", return_value=response
+            ) as execute:
                 baseline = policy_apply.revert_base_file("test", None)
             self.assertEqual(baseline, path)
-            self.assertEqual(execute.call_args.args[0],
-                             ["openshell", "sandbox", "get", "test", "-o", "json"])
+            self.assertEqual(
+                execute.call_args.args[0],
+                ["openshell", "sandbox", "get", "test", "-o", "json"],
+            )
             path.write_text("network_policies: {updated: {}}\n")
-            self.assertEqual(policy_apply.load_base_network_policies(baseline), {"updated": {}})
+            self.assertEqual(
+                policy_apply.load_base_network_policies(baseline), {"updated": {}}
+            )
 
     def test_unreadable_source_requires_override_before_policy_set(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             path = Path(temporary) / "unreadable.yaml"
             path.write_text("network_policies: {}\n")
-            response = mock.Mock(returncode=0, stdout=json.dumps({
-                "annotations": {policy_apply.POLICY_SOURCE_ANNOTATION: str(path)},
-            }))
+            response = mock.Mock(
+                returncode=0,
+                stdout=json.dumps(
+                    {
+                        "annotations": {
+                            policy_apply.POLICY_SOURCE_ANNOTATION: str(path)
+                        },
+                    }
+                ),
+            )
             live = {"network_policies": {"existing": {}}}
-            with mock.patch.object(sys, "argv", ["apply.py", "-s", "test", "--revert"]), \
-                 mock.patch.object(policy_apply, "get_live_policy", return_value=live), \
-                 mock.patch.object(policy_apply.subprocess, "run", return_value=response), \
-                 mock.patch.object(Path, "open", side_effect=PermissionError("permission denied")), \
-                 mock.patch.object(policy_apply, "apply_policy") as apply:
-                with self.assertRaisesRegex(SystemExit, "cannot read.*--base-file PATH"):
+            with (
+                mock.patch.object(sys, "argv", ["apply.py", "-s", "test", "--revert"]),
+                mock.patch.object(policy_apply, "get_live_policy", return_value=live),
+                mock.patch.object(
+                    policy_apply.subprocess, "run", return_value=response
+                ),
+                mock.patch.object(
+                    Path, "open", side_effect=PermissionError("permission denied")
+                ),
+                mock.patch.object(policy_apply, "apply_policy") as apply,
+            ):
+                with self.assertRaisesRegex(
+                    SystemExit, "cannot read.*--base-file PATH"
+                ):
                     policy_apply.main()
                 apply.assert_not_called()
 
@@ -76,25 +106,52 @@ class RevertBaselineTests(unittest.TestCase):
             root = Path(temporary)
             link = root / "moved.yaml"
             link.symlink_to(root / "missing.yaml")
-            documents = [None, [], {}, {"annotations": []}, {"annotations": {}},
-                         *({"annotations": {policy_apply.POLICY_SOURCE_ANNOTATION: value}}
-                           for value in (None, [], 1, "", "relative.yaml", "bad\0path",
-                                         str(root), str(root / "missing.yaml"), str(link)))]
+            documents = [
+                None,
+                [],
+                {},
+                {"annotations": []},
+                {"annotations": {}},
+                *(
+                    {"annotations": {policy_apply.POLICY_SOURCE_ANNOTATION: value}}
+                    for value in (
+                        None,
+                        [],
+                        1,
+                        "",
+                        "relative.yaml",
+                        "bad\0path",
+                        str(root),
+                        str(root / "missing.yaml"),
+                        str(link),
+                    )
+                ),
+            ]
             for document in documents:
                 with self.subTest(document=document):
                     result = mock.Mock(returncode=0, stdout=json.dumps(document))
-                    with mock.patch.object(policy_apply.subprocess, "run", return_value=result):
-                        with self.assertRaisesRegex(policy_apply.PolicyError, "--base-file PATH"):
+                    with mock.patch.object(
+                        policy_apply.subprocess, "run", return_value=result
+                    ):
+                        with self.assertRaisesRegex(
+                            policy_apply.PolicyError, "--base-file PATH"
+                        ):
                             policy_apply.revert_base_file("test", None)
-        for result in (mock.Mock(returncode=1, stderr="not found"),
-                       mock.Mock(returncode=0, stdout="invalid json")):
+        for result in (
+            mock.Mock(returncode=1, stderr="not found"),
+            mock.Mock(returncode=0, stdout="invalid json"),
+        ):
             with mock.patch.object(policy_apply.subprocess, "run", return_value=result):
-                with self.assertRaisesRegex(policy_apply.PolicyError, "--base-file PATH"):
+                with self.assertRaisesRegex(
+                    policy_apply.PolicyError, "--base-file PATH"
+                ):
                     policy_apply.revert_base_file("test", None)
 
 
 class ExternalPolicyIntegrationTests(unittest.TestCase):
-    def test_annotated_revert_from_another_directory_and_normal_apply_skip_lookup(self) -> None:
+    def test_annotated_revert_from_another_directory_and_normal_apply_skip_lookup(
+        self,
+    ) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             directory = Path(temporary)
             baseline = directory / "baseline with spaces=one.yaml"
@@ -102,10 +159,12 @@ class ExternalPolicyIntegrationTests(unittest.TestCase):
             other = directory / "unrelated"
             other.mkdir()
             (other / ".exoshell.local.toml").write_text("invalid toml [")
-            live = {"filesystem_policy": {"read_write": ["/live-only"]},
-                    "landlock": {"compatibility": "best_effort"},
-                    "process": {"run_as_user": "sandbox"},
-                    "network_policies": {"temporary_grant": {}}}
+            live = {
+                "filesystem_policy": {"read_write": ["/live-only"]},
+                "landlock": {"compatibility": "best_effort"},
+                "process": {"run_as_user": "sandbox"},
+                "network_policies": {"temporary_grant": {}},
+            }
             binary = directory / "openshell"
             binary.write_text(
                 "#!/usr/bin/env python3\nimport json, os, sys\n"
@@ -118,26 +177,57 @@ class ExternalPolicyIntegrationTests(unittest.TestCase):
             )
             binary.chmod(0o755)
             called = directory / "metadata-called"
-            environment = {**os.environ, "PATH": f"{directory}:{os.environ['PATH']}",
-                           "LIVE_POLICY": json.dumps({"policy": live}),
-                           "METADATA_CALL": str(called),
-                           "SANDBOX_METADATA": json.dumps({"annotations": {
-                               policy_apply.POLICY_SOURCE_ANNOTATION: str(baseline)}})}
-            command = [sys.executable, str(ROOT / "policy-overlays/apply.py"),
-                       "--sandbox", "test", "--dry-run"]
-            result = subprocess.run(command, cwd=other, env=environment,
-                                    capture_output=True, text=True)
+            environment = {
+                **os.environ,
+                "PATH": f"{directory}:{os.environ['PATH']}",
+                "LIVE_POLICY": json.dumps({"policy": live}),
+                "METADATA_CALL": str(called),
+                "SANDBOX_METADATA": json.dumps(
+                    {
+                        "annotations": {
+                            policy_apply.POLICY_SOURCE_ANNOTATION: str(baseline)
+                        }
+                    }
+                ),
+            }
+            command = [
+                sys.executable,
+                str(ROOT / "policy-overlays/apply.py"),
+                "--sandbox",
+                "test",
+                "--dry-run",
+            ]
+            result = subprocess.run(
+                command,
+                check=False,
+                cwd=other,
+                env=environment,
+                capture_output=True,
+                text=True,
+            )
             self.assertEqual(result.returncode, 0, result.stderr)
             self.assertEqual(yaml.safe_load(result.stdout), live)
             self.assertFalse(called.exists())
-            result = subprocess.run([*command, "--revert"], cwd=other, env=environment,
-                                    capture_output=True, text=True)
+            result = subprocess.run(
+                [*command, "--revert"],
+                check=False,
+                cwd=other,
+                env=environment,
+                capture_output=True,
+                text=True,
+            )
             self.assertEqual(result.returncode, 0, result.stderr)
             self.assertTrue(called.exists())
             final = yaml.safe_load(result.stdout)
             self.assertEqual(final.pop("network_policies"), {"baseline": {}})
-            self.assertEqual(final, {key: value for key, value in live.items()
-                                     if key != "network_policies"})
+            self.assertEqual(
+                final,
+                {
+                    key: value
+                    for key, value in live.items()
+                    if key != "network_policies"
+                },
+            )
 
     def test_explicit_baseline_and_overlay_preserve_live_static_sections(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
@@ -151,26 +241,45 @@ class ExternalPolicyIntegrationTests(unittest.TestCase):
             live_file = directory / "live.json"
             live_file.write_text(json.dumps({"policy": live}))
             baseline_file = directory / "baseline.yaml"
-            baseline_file.write_text(yaml.safe_dump({
-                "filesystem_policy": {"read_write": ["/different"]},
-                "network_policies": {"base": {"endpoints": []}},
-            }))
+            baseline_file.write_text(
+                yaml.safe_dump(
+                    {
+                        "filesystem_policy": {"read_write": ["/different"]},
+                        "network_policies": {"base": {"endpoints": []}},
+                    }
+                )
+            )
             overlay_file = directory / "external-overlay.yaml"
             overlay_file.write_text("network_policies:\n  extra: {endpoints: []}\n")
             binary = directory / "openshell"
             binary.write_text(
-                '#!/usr/bin/env bash\nset -euo pipefail\n'
+                "#!/usr/bin/env bash\nset -euo pipefail\n"
                 '[[ "$*" == "policy get test --base -o json" ]]\n'
                 'cat "$LIVE_POLICY"\n'
             )
             binary.chmod(0o755)
-            environment = {**os.environ, "PATH": f"{directory}:{os.environ['PATH']}",
-                           "LIVE_POLICY": str(live_file)}
+            environment = {
+                **os.environ,
+                "PATH": f"{directory}:{os.environ['PATH']}",
+                "LIVE_POLICY": str(live_file),
+            }
             result = subprocess.run(
-                [sys.executable, str(ROOT / "policy-overlays/apply.py"),
-                 "--sandbox", "test", "--base-file", str(baseline_file),
-                 "--revert", "--dry-run", str(overlay_file)],
-                cwd=directory, env=environment, capture_output=True, text=True,
+                [
+                    sys.executable,
+                    str(ROOT / "policy-overlays/apply.py"),
+                    "--sandbox",
+                    "test",
+                    "--base-file",
+                    str(baseline_file),
+                    "--revert",
+                    "--dry-run",
+                    str(overlay_file),
+                ],
+                check=False,
+                cwd=directory,
+                env=environment,
+                capture_output=True,
+                text=True,
             )
             self.assertEqual(result.returncode, 0, result.stderr)
             final = yaml.safe_load(result.stdout)
@@ -190,13 +299,17 @@ class OverlayCompositionTests(unittest.TestCase):
             }
         }
         replacement = {"service": {"endpoints": [{"host": "new.example.com"}]}}
-        composed = policy_apply.compose_network_policies(base, [(Path("replacement.yaml"), replacement)])
+        composed = policy_apply.compose_network_policies(
+            base, [(Path("replacement.yaml"), replacement)]
+        )
         self.assertEqual(composed["service"], replacement["service"])
 
     def test_distinct_entries_compose(self) -> None:
         base = {"base": {"endpoints": []}}
         overlay = {"extra": {"binaries": []}}
-        composed = policy_apply.compose_network_policies(base, [(Path("extra.yaml"), overlay)])
+        composed = policy_apply.compose_network_policies(
+            base, [(Path("extra.yaml"), overlay)]
+        )
         self.assertEqual(set(composed), {"base", "extra"})
 
     def test_duplicate_overlay_key_is_rejected(self) -> None:
@@ -209,9 +322,13 @@ class OverlayCompositionTests(unittest.TestCase):
 
     def test_gitlab_only_composition_does_not_require_github(self) -> None:
         base = {"gitlab": {"endpoints": [endpoint("gitlab.com", "/api/graphql")]}}
-        policy_apply.validate_invariants(policy_apply.compose_network_policies(base, []))
+        policy_apply.validate_invariants(
+            policy_apply.compose_network_policies(base, [])
+        )
 
-    def test_host_specific_gitlab_overlay_replaces_its_matching_baseline_key(self) -> None:
+    def test_host_specific_gitlab_overlay_replaces_its_matching_baseline_key(
+        self,
+    ) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             directory = Path(temporary)
             base_path = directory / "policy.yaml"
@@ -232,14 +349,20 @@ class OverlayCompositionTests(unittest.TestCase):
             base = policy_apply.load_base_network_policies(base_path)
             resolved = policy_apply.resolve_overlay(str(overlay_path))
             overlay = policy_apply.load_overlay(resolved)
-            composed = policy_apply.compose_network_policies(base, [(resolved, overlay)])
-            self.assertEqual(composed["gitlab_example_graphql"], overlay["gitlab_example_graphql"])
+            composed = policy_apply.compose_network_policies(
+                base, [(resolved, overlay)]
+            )
+            self.assertEqual(
+                composed["gitlab_example_graphql"], overlay["gitlab_example_graphql"]
+            )
             policy_apply.validate_invariants(composed)
 
     def test_revert_diff_compares_live_state_to_final_state(self) -> None:
         live = {"base": {}, "active_overlay": {}}
         final = {"base": {}}
-        self.assertEqual(policy_apply.summarise_diff(live, final), ["  - active_overlay"])
+        self.assertEqual(
+            policy_apply.summarise_diff(live, final), ["  - active_overlay"]
+        )
 
 
 class OverlayValidationTests(unittest.TestCase):
@@ -252,7 +375,9 @@ class OverlayValidationTests(unittest.TestCase):
 
     def test_duplicate_yaml_keys_are_rejected(self) -> None:
         path = self.write_overlay("network_policies:\n  service: {}\n  service: {}\n")
-        with self.assertRaisesRegex(policy_apply.PolicyError, "duplicate YAML key 'service'"):
+        with self.assertRaisesRegex(
+            policy_apply.PolicyError, "duplicate YAML key 'service'"
+        ):
             policy_apply.load_overlay(path)
 
     def test_malformed_overlay_shapes_are_rejected(self) -> None:
@@ -282,7 +407,9 @@ class OverlayValidationTests(unittest.TestCase):
     def test_access_and_rules_are_mutually_exclusive(self) -> None:
         policies = {
             "service": {
-                "endpoints": [{"host": "example.com", "access": "read-only", "rules": []}]
+                "endpoints": [
+                    {"host": "example.com", "access": "read-only", "rules": []}
+                ]
             }
         }
         with self.assertRaisesRegex(policy_apply.PolicyError, "mutually exclusive"):
@@ -307,7 +434,9 @@ class OverlayValidationTests(unittest.TestCase):
         }
         for name, policies in cases.items():
             with self.subTest(name=name):
-                with self.assertRaisesRegex(policy_apply.PolicyError, "duplicate GraphQL selector"):
+                with self.assertRaisesRegex(
+                    policy_apply.PolicyError, "duplicate GraphQL selector"
+                ):
                     policy_apply.validate_invariants(policies)
 
 

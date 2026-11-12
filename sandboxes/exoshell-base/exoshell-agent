@@ -4,12 +4,11 @@
 import copy
 import json
 import os
-from pathlib import Path
 import shutil
 import subprocess
 import sys
 import tempfile
-
+from pathlib import Path
 
 WORKSPACE = Path("/workspace")
 GWS_DIR = Path("/tmp/gws")
@@ -30,8 +29,11 @@ def fail(message: str) -> None:
     raise SystemExit(2)
 
 
-def initialize_skills(environment: dict[str, str], destination: Path = SKILLS_DIR,
-                      snapshot_path: Path = Path("/tmp/exoshell-skills")) -> None:
+def initialize_skills(
+    environment: dict[str, str],
+    destination: Path = SKILLS_DIR,
+    snapshot_path: Path = Path("/tmp/exoshell-skills"),
+) -> None:
     """Copy the launcher snapshot once, preserving every existing image skill."""
     snapshot = environment.pop("EXOSHELL_SKILLS_SNAPSHOT", None)
     if snapshot is None:
@@ -41,7 +43,11 @@ def initialize_skills(environment: dict[str, str], destination: Path = SKILLS_DI
             fail("invalid skill snapshot path")
         sources = sorted(Path(snapshot).iterdir())
         for source in sources:
-            if source.is_symlink() or not source.is_dir() or not (source / "SKILL.md").is_file():
+            if (
+                source.is_symlink()
+                or not source.is_dir()
+                or not (source / "SKILL.md").is_file()
+            ):
                 fail(f"invalid skill snapshot entry: {source.name}")
             target = destination / source.name
             if target.exists() or target.is_symlink():
@@ -60,7 +66,9 @@ def object_field(config: dict, key: str) -> dict:
     return value
 
 
-def initialize_codex_auth(command: list[str], environment: dict[str, str], project: Path) -> None:
+def initialize_codex_auth(
+    command: list[str], environment: dict[str, str], project: Path
+) -> None:
     """Cache the current provider credential before starting the Codex session."""
     credential = environment.get("OPENAI_API_KEY")
     if Path(command[0]).name != "codex" or not credential:
@@ -68,8 +76,11 @@ def initialize_codex_auth(command: list[str], environment: dict[str, str], proje
     try:
         result = subprocess.run(
             [command[0], "login", "--with-api-key"],
-            input=credential.encode("utf-8"), capture_output=True,
-            env=environment, cwd=project,
+            check=False,
+            input=credential.encode("utf-8"),
+            capture_output=True,
+            env=environment,
+            cwd=project,
         )
     except (OSError, UnicodeError):
         fail("could not initialize Codex API-key login")
@@ -78,10 +89,20 @@ def initialize_codex_auth(command: list[str], environment: dict[str, str], proje
         fail("could not initialize Codex API-key login")
 
 
-def initialize_claude_mcp(environment: dict[str, str], project: Path, enabled: bool,
-                          template: Path = CLAUDE_MCP_TEMPLATE) -> None:
-    directory = Path(environment.get("CLAUDE_CONFIG_DIR") or
-                     Path(environment.get("HOME", "/sandbox")) / ".claude").expanduser().resolve()
+def initialize_claude_mcp(
+    environment: dict[str, str],
+    project: Path,
+    enabled: bool,
+    template: Path = CLAUDE_MCP_TEMPLATE,
+) -> None:
+    directory = (
+        Path(
+            environment.get("CLAUDE_CONFIG_DIR")
+            or Path(environment.get("HOME", "/sandbox")) / ".claude"
+        )
+        .expanduser()
+        .resolve()
+    )
     target = directory / ".claude.json"
     temporary = None
     try:
@@ -96,11 +117,15 @@ def initialize_claude_mcp(environment: dict[str, str], project: Path, enabled: b
         state = object_field(projects, str(project))
         local_servers = object_field(state, "mcpServers")
         disabled = state.setdefault("disabledMcpServers", [])
-        if not isinstance(disabled, list) or any(not isinstance(name, str) for name in disabled):
+        if not isinstance(disabled, list) or any(
+            not isinstance(name, str) for name in disabled
+        ):
             fail("Claude disabledMcpServers must be a list of names")
         state["disabledMcpServers"] = [name for name in disabled if name != "atlassian"]
         if enabled:
-            definition = json.loads(template.read_text(encoding="utf-8"))["mcpServers"]["atlassian"]
+            definition = json.loads(template.read_text(encoding="utf-8"))["mcpServers"][
+                "atlassian"
+            ]
             if not isinstance(definition, dict):
                 fail("Claude Atlassian MCP template must contain a server object")
             servers["atlassian"] = definition
@@ -113,7 +138,9 @@ def initialize_claude_mcp(environment: dict[str, str], project: Path, enabled: b
             state["disabledMcpServers"].append("atlassian")
 
         directory.mkdir(mode=0o700, parents=True, exist_ok=True)
-        with tempfile.NamedTemporaryFile(mode="w", encoding="utf-8", dir=directory, delete=False) as file:
+        with tempfile.NamedTemporaryFile(
+            mode="w", encoding="utf-8", dir=directory, delete=False
+        ) as file:
             temporary = Path(file.name)
             os.fchmod(file.fileno(), 0o600)
             json.dump(config, file)
@@ -129,7 +156,9 @@ def initialize_claude_mcp(environment: dict[str, str], project: Path, enabled: b
     environment["CLAUDE_CONFIG_DIR"] = str(directory)
 
 
-def initialize_atlassian_mcp(command: list[str], environment: dict[str, str], project: Path) -> list[str]:
+def initialize_atlassian_mcp(
+    command: list[str], environment: dict[str, str], project: Path
+) -> list[str]:
     """The credential placeholder, rather than an instance name, selects MCP."""
     agent = Path(command[0]).name
     enabled = bool(environment.get(ATLASSIAN_KEY))
@@ -138,7 +167,10 @@ def initialize_atlassian_mcp(command: list[str], environment: dict[str, str], pr
         # Put the managed leaf last so existing -c overrides cannot select a
         # different state. Keep a literal -- and its positional arguments intact.
         position = command.index("--") if "--" in command else len(command)
-        command[position:position] = ["--config", f"mcp_servers.atlassian.enabled={str(enabled).lower()}"]
+        command[position:position] = [
+            "--config",
+            f"mcp_servers.atlassian.enabled={str(enabled).lower()}",
+        ]
     elif agent == "opencode":
         try:
             config = json.loads(environment.get("OPENCODE_CONFIG_CONTENT") or "{}")
@@ -162,22 +194,32 @@ def initialize_atlassian_mcp(command: list[str], environment: dict[str, str], pr
     return command
 
 
-def initialize_opencode_defaults(command: list[str], environment: dict[str, str]) -> None:
+def initialize_opencode_defaults(
+    command: list[str], environment: dict[str, str]
+) -> None:
     """Merge interactive model defaults into disposable inline config."""
     defaults_text = environment.pop("EXOSHELL_OPENCODE_DEFAULTS", None)
     if Path(command[0]).name != "opencode" or defaults_text is None:
         return
     try:
         defaults = json.loads(defaults_text)
-        if (not isinstance(defaults, dict) or set(defaults) - {"model", "variant"}
-                or not isinstance(defaults.get("model"), str) or not defaults["model"].strip()):
+        if (
+            not isinstance(defaults, dict)
+            or set(defaults) - {"model", "variant"}
+            or not isinstance(defaults.get("model"), str)
+            or not defaults["model"].strip()
+        ):
             fail("EXOSHELL_OPENCODE_DEFAULTS must contain a non-empty model string")
         variant = defaults.get("variant")
-        if variant is not None and (not isinstance(variant, str) or not variant.strip()):
+        if variant is not None and (
+            not isinstance(variant, str) or not variant.strip()
+        ):
             fail("EXOSHELL_OPENCODE_DEFAULTS variant must be a non-empty string")
         if variant is not None and "#" in defaults["model"]:
             fail("EXOSHELL_OPENCODE_DEFAULTS model must not already contain a variant")
-        selected = defaults["model"] if variant is None else f"{defaults['model']}#{variant}"
+        selected = (
+            defaults["model"] if variant is None else f"{defaults['model']}#{variant}"
+        )
         config = json.loads(environment.get("OPENCODE_CONFIG_CONTENT") or "{}")
         if not isinstance(config, dict):
             fail("OPENCODE_CONFIG_CONTENT must be a JSON object")
@@ -191,7 +233,9 @@ def initialize_opencode_defaults(command: list[str], environment: dict[str, str]
         fail("could not prepare OpenCode model defaults")
 
 
-def initialize_opencode_websearch(command: list[str], environment: dict[str, str]) -> None:
+def initialize_opencode_websearch(
+    command: list[str], environment: dict[str, str]
+) -> None:
     """Select attached Tavily without copying its credential into configuration."""
     if Path(command[0]).name != "opencode" or not environment.get("TAVILY_API_KEY"):
         return
@@ -218,7 +262,9 @@ def initialize_gws(environment: dict[str, str], directory: Path = GWS_DIR) -> No
     if missing:
         fail(f"GWS requires non-empty environment values: {', '.join(missing)}")
     if not directory.is_dir():
-        fail(f"GWS directory is missing: {directory} (provide a writable directory there)")
+        fail(
+            f"GWS directory is missing: {directory} (provide a writable directory there)"
+        )
 
     config_dir = directory / "config"
     try:
@@ -238,7 +284,9 @@ def initialize_gws(environment: dict[str, str], directory: Path = GWS_DIR) -> No
     target = directory / "credentials.json"
     temporary = None
     try:
-        with tempfile.NamedTemporaryFile(mode="w", encoding="utf-8", dir=directory, delete=False) as file:
+        with tempfile.NamedTemporaryFile(
+            mode="w", encoding="utf-8", dir=directory, delete=False
+        ) as file:
             temporary = Path(file.name)
             os.fchmod(file.fileno(), 0o600)
             json.dump(credentials, file)
