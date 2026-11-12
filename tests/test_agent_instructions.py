@@ -1,14 +1,13 @@
 from __future__ import annotations
 
 import json
-from pathlib import Path
 import runpy
 import subprocess
 import sys
 import tempfile
 import tomllib
 import unittest
-
+from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 IMAGE = ROOT / "sandboxes/exoshell-base"
@@ -20,7 +19,9 @@ class AgentInstructionTests(unittest.TestCase):
     def test_render_preserves_template_and_round_trips_markdown(self) -> None:
         template = (IMAGE / "codex.config.toml").read_text(encoding="utf-8")
         first = '# First\nUse "quotes", \'apostrophes\', and """triple quotes""".\n'
-        second = '```bash\nrg "\\\\path"\n```\nUnicode: café 🐚\nControl: \t\b\f\x00\x7f\n'
+        second = (
+            '```bash\nrg "\\\\path"\n```\nUnicode: café 🐚\nControl: \t\b\f\x00\x7f\n'
+        )
         expected = first.rstrip("\n") + "\n\n" + second.rstrip("\n") + "\n"
         with tempfile.TemporaryDirectory() as temporary:
             directory = Path(temporary)
@@ -43,8 +44,14 @@ class AgentInstructionTests(unittest.TestCase):
                 self.assertEqual(path.stat().st_mode & 0o777, 0o644)
 
     def test_existing_instructions_and_missing_sources_fail_before_writes(self) -> None:
-        for template, has_sources in (("developer_instructions = ''\n", True), ("", False)):
-            with self.subTest(template=template), tempfile.TemporaryDirectory() as temporary:
+        for template, has_sources in (
+            ("developer_instructions = ''\n", True),
+            ("", False),
+        ):
+            with (
+                self.subTest(template=template),
+                tempfile.TemporaryDirectory() as temporary,
+            ):
                 directory = Path(temporary)
                 sources = directory / "instructions"
                 sources.mkdir()
@@ -64,8 +71,10 @@ class AgentInstructionTests(unittest.TestCase):
         paths = sorted(sources.glob("*.md"))
         self.assertTrue(paths)
         opencode = json.loads((IMAGE / "opencode.json").read_text())
-        self.assertEqual(opencode["instructions"],
-                         [f"/etc/exoshell/instructions/{path.name}" for path in paths])
+        self.assertEqual(
+            opencode["instructions"],
+            [f"/etc/exoshell/instructions/{path.name}" for path in paths],
+        )
         expected = "\n\n".join(path.read_text().rstrip("\n") for path in paths) + "\n"
         with tempfile.TemporaryDirectory() as temporary:
             directory = Path(temporary)
@@ -73,12 +82,24 @@ class AgentInstructionTests(unittest.TestCase):
             claude = directory / "claude-code/CLAUDE.md"
             codex.write_text((IMAGE / "codex.config.toml").read_text())
             result = subprocess.run(
-                [sys.executable, str(HELPER), "--instructions-dir", str(sources),
-                 "--codex-config", str(codex), "--claude-memory", str(claude)],
-                capture_output=True, text=True,
+                [
+                    sys.executable,
+                    str(HELPER),
+                    "--instructions-dir",
+                    str(sources),
+                    "--codex-config",
+                    str(codex),
+                    "--claude-memory",
+                    str(claude),
+                ],
+                check=False,
+                capture_output=True,
+                text=True,
             )
             self.assertEqual(result.returncode, 0, result.stderr)
-            self.assertEqual(tomllib.loads(codex.read_text())["developer_instructions"], expected)
+            self.assertEqual(
+                tomllib.loads(codex.read_text())["developer_instructions"], expected
+            )
             self.assertEqual(claude.read_text(), expected)
 
 

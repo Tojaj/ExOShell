@@ -1,14 +1,51 @@
 # Contributing to ExOShell
 
+## Local checks
+
+Use Git and Python 3.11 or newer with `venv` and pip support. From the
+repository root:
+
+```bash
+python3 -m venv .venv
+. .venv/bin/activate
+python -m pip install -r requirements-dev.txt
+pre-commit run --all-files --show-diff-on-failure
+pre-commit run gitleaks-checkout --all-files --hook-stage manual
+```
+
+Checks are configured in [`.pre-commit-config.yaml`](.pre-commit-config.yaml).
+The first run downloads tools. Some hooks modify files; review the changes and
+rerun until all checks pass. Keep the virtual environment active so actionlint
+can find ShellCheck when checking workflow scripts.
+
+The manual Gitleaks check scans the working tree, including untracked files;
+the commit hook checks staged changes.
+
+Optionally install the commit hooks with `pre-commit install`.
+
+## Tests
+
+Tests assume a Unix environment with Bash, `jq`, and `openssl`; startup tests
+also need a writable `/workspace`. With the virtual environment active, run
+both suites outside pre-commit:
+
+```bash
+python scripts/run-unit-tests.py --allow-missing-clients tests
+python scripts/run-unit-tests.py .agents/skills/bump-exoshell-base-versions/tests
+```
+
+`--allow-missing-clients` permits selected installed-agent tests to skip when
+their required clients are unavailable. Omit it to require zero skips.
+
+See the [CI workflow](.github/workflows/ci.yaml) for hosted checks and
+[ADR-0045](adrs/adr0045-unprivileged-first-phase-ci.md) for CI design decisions.
+
 ## Commit messages
 
-- Use clear and descriptive and commit messages.
-- Follow Conventional Commits spec - i.e. Prefix title type such as feat, fix,
-  docs, chore, .. and if applicable also scope - e.g. `policy`, `provider`, `runner`, ..
-- Use imperative mood: "fix .." not "fixes ..".
-- Concise body must focus on why, not what. The "what" is visible in the diff.
-- The message should explain the motivation, the reasoning, or what problem is being solved.
-- Call out consequences of the change that are non-obvious and anything important
-  reviewer should know.
-- Body has lines wrapped at 75 columns.
-- Insert an empty line between title (first line) and body.
+- Use clear, descriptive commit messages following Conventional Commits, with
+  a type such as `feat`, `fix`, `docs`, or `chore` and an optional scope such as
+  `policy`, `provider`, or `runner`.
+- Use imperative mood: "fix" rather than "fixes".
+- Keep the body concise: explain the motivation and reasoning; the diff shows
+  what changed. Call out non-obvious consequences for reviewers.
+- Separate the title and body with a blank line and wrap body lines at 75 columns.

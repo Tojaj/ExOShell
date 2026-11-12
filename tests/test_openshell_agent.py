@@ -4,7 +4,6 @@ import argparse
 import io
 import json
 import os
-from pathlib import Path
 import runpy
 import shutil
 import subprocess
@@ -12,14 +11,15 @@ import sys
 import tempfile
 import textwrap
 import unittest
+from pathlib import Path
 from unittest import mock
-
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "scripts"))
-import exoshell_agent as launcher  # noqa: E402
+import exoshell_agent as launcher
+
 sys.path.insert(0, str(ROOT / "policy-overlays"))
-import apply as policy_apply  # noqa: E402
+import apply as policy_apply
 
 
 class ConfigTests(unittest.TestCase):
@@ -54,7 +54,7 @@ class ConfigTests(unittest.TestCase):
             "agent": 'agent = "other"\n',
             "agent-type": "agent = []\n",
             "unknown-agent": "[agents.other]\nproviders = []\n",
-            "unknown-agent-key": "[agents.codex]\nimage = \"bad\"\n",
+            "unknown-agent-key": '[agents.codex]\nimage = "bad"\n',
             "duplicate": 'providers = ["one", "one"]\n',
             "agent-duplicate": '[agents.codex]\nproviders = ["one", "one"]\n',
         }
@@ -99,29 +99,45 @@ class DiscoveryTests(unittest.TestCase):
         self.addCleanup(system.stop)
 
     def command(self, *arguments: str) -> list[str]:
-        with mock.patch.object(launcher, "git_identity", return_value=("Test", "test@example.com")), \
-             mock.patch.object(launcher.subprocess, "run", return_value=mock.Mock(returncode=0)) as execute:
+        with (
+            mock.patch.object(
+                launcher, "git_identity", return_value=("Test", "test@example.com")
+            ),
+            mock.patch.object(
+                launcher.subprocess, "run", return_value=mock.Mock(returncode=0)
+            ) as execute,
+        ):
             self.assertEqual(launcher.run(arguments, cwd=self.cwd), 0)
         return execute.call_args.args[0]
 
-    def assert_policy_rejected_before_subprocesses(self, arguments: list[str], message: str) -> None:
-        with mock.patch.object(launcher, "git_identity") as identity, \
-             mock.patch.object(launcher.subprocess, "run") as execute:
+    def assert_policy_rejected_before_subprocesses(
+        self, arguments: list[str], message: str
+    ) -> None:
+        with (
+            mock.patch.object(launcher, "git_identity") as identity,
+            mock.patch.object(launcher.subprocess, "run") as execute,
+        ):
             with self.assertRaisesRegex(launcher.LauncherError, message):
                 launcher.run(arguments, cwd=self.cwd)
             identity.assert_not_called()
             execute.assert_not_called()
 
-    def test_missing_policy_stops_launch_without_config_or_with_partial_config(self) -> None:
+    def test_missing_policy_stops_launch_without_config_or_with_partial_config(
+        self,
+    ) -> None:
         for content in (None, "", 'image = "registry.example/local"\n'):
             with self.subTest(content=content):
                 if content is not None:
                     self.local.write_text(content)
-                self.assert_policy_rejected_before_subprocesses([], "no sandbox policy selected")
-        with mock.patch.object(sys, "argv", ["run-exoshell-agent.sh"]), \
-             mock.patch.object(Path, "cwd", return_value=self.cwd), \
-             mock.patch.object(sys, "stderr", new_callable=io.StringIO) as stderr, \
-             mock.patch.object(launcher.subprocess, "run") as execute:
+                self.assert_policy_rejected_before_subprocesses(
+                    [], "no sandbox policy selected"
+                )
+        with (
+            mock.patch.object(sys, "argv", ["run-exoshell-agent.sh"]),
+            mock.patch.object(Path, "cwd", return_value=self.cwd),
+            mock.patch.object(sys, "stderr", new_callable=io.StringIO) as stderr,
+            mock.patch.object(launcher.subprocess, "run") as execute,
+        ):
             self.assertEqual(launcher.main(), 2)
             execute.assert_not_called()
         for remedy in ("--policy PATH", "'policy'", "--no-policy"):
@@ -141,12 +157,18 @@ class DiscoveryTests(unittest.TestCase):
                         arguments = ["--policy", path.name]
                     else:
                         self.local.write_text(f'policy = "{path.name}"\n')
-                        arguments = ["--config", str(self.local)] if source == "explicit" else []
+                        arguments = (
+                            ["--config", str(self.local)]
+                            if source == "explicit"
+                            else []
+                        )
                     self.assert_policy_rejected_before_subprocesses(
                         arguments, "policy file does not exist"
                     )
 
-    def test_valid_policy_paths_resolve_relative_to_source_and_follow_symlinks(self) -> None:
+    def test_valid_policy_paths_resolve_relative_to_source_and_follow_symlinks(
+        self,
+    ) -> None:
         cli_policy = self.cwd / "policy with spaces=baseline.yaml"
         cli_policy.write_text("network_policies: {}\n")
         configured_policy = self.user.parent / cli_policy.name
@@ -158,32 +180,52 @@ class DiscoveryTests(unittest.TestCase):
         for relative in (cli_policy.name, cli_link.name):
             with self.subTest(relative=relative):
                 command = self.command("--policy", relative)
-                self.assertEqual(command[command.index("--policy") + 1], str(cli_policy))
-                self.assertEqual(command[command.index("--annotation") + 1],
-                                 f"exoshell.policy-source-file={cli_policy}")
+                self.assertEqual(
+                    command[command.index("--policy") + 1], str(cli_policy)
+                )
+                self.assertEqual(
+                    command[command.index("--annotation") + 1],
+                    f"exoshell.policy-source-file={cli_policy}",
+                )
                 self.user.write_text(f'policy = "{relative}"\n')
                 command = self.command("--config", str(self.user))
-                self.assertEqual(command[command.index("--policy") + 1], str(configured_policy))
-                self.assertEqual(command[command.index("--annotation") + 1],
-                                 f"exoshell.policy-source-file={configured_policy}")
+                self.assertEqual(
+                    command[command.index("--policy") + 1], str(configured_policy)
+                )
+                self.assertEqual(
+                    command[command.index("--annotation") + 1],
+                    f"exoshell.policy-source-file={configured_policy}",
+                )
 
-    def test_cli_policy_override_and_opt_out_ignore_invalid_configured_path(self) -> None:
+    def test_cli_policy_override_and_opt_out_ignore_invalid_configured_path(
+        self,
+    ) -> None:
         self.local.write_text('policy = "missing.yaml"\n')
         replacement = self.cwd / "replacement.yaml"
         replacement.write_text("network_policies: {}\n")
         command = self.command("--policy", replacement.name)
         self.assertEqual(command[command.index("--policy") + 1], str(replacement))
-        self.assertEqual(command[command.index("--annotation") + 1],
-                         f"exoshell.policy-source-file={replacement}")
+        self.assertEqual(
+            command[command.index("--annotation") + 1],
+            f"exoshell.policy-source-file={replacement}",
+        )
         self.assertNotIn("--policy", self.command("--no-policy"))
         self.assertNotIn("--annotation", self.command("--no-policy"))
         self.local.unlink()
         self.assertNotIn("--policy", self.command("--no-policy"))
 
     def test_each_location_and_precedence_then_defaults(self) -> None:
-        for name, path in (("caller", self.local), ("user", self.user), ("system", self.system)):
+        for name, path in (
+            ("caller", self.local),
+            ("user", self.user),
+            ("system", self.system),
+        ):
             path.write_text(f'image = "registry.example/{name}"\n')
-        for name, path in (("caller", self.local), ("user", self.user), ("system", self.system)):
+        for name, path in (
+            ("caller", self.local),
+            ("user", self.user),
+            ("system", self.system),
+        ):
             with self.subTest(location=name):
                 self.assertEqual(launcher.discover_config(None, cwd=self.cwd), path)
                 self.assertIn(f"registry.example/{name}", self.command("--no-policy"))
@@ -200,8 +242,13 @@ class DiscoveryTests(unittest.TestCase):
         explicit.write_text('image = "registry.example/explicit"\n')
         for argument in (explicit.name, str(explicit)):
             with self.subTest(argument=argument):
-                self.assertEqual(launcher.discover_config(Path(argument), cwd=self.cwd), explicit)
-                self.assertIn("registry.example/explicit", self.command("--no-policy", "--config", argument))
+                self.assertEqual(
+                    launcher.discover_config(Path(argument), cwd=self.cwd), explicit
+                )
+                self.assertIn(
+                    "registry.example/explicit",
+                    self.command("--no-policy", "--config", argument),
+                )
         self.user.write_text('image = "registry.example/user"\n')
         with self.assertRaisesRegex(launcher.LauncherError, "does not exist"):
             self.command("--config", "missing.toml")
@@ -221,10 +268,14 @@ class DiscoveryTests(unittest.TestCase):
                 self.assertEqual(launcher.discover_config(None, cwd=self.cwd), expected)
 
     def test_empty_and_partial_configs_do_not_inherit(self) -> None:
-        self.user.write_text('agent = "claude"\nimage = "registry.example/user"\nproviders = ["user"]\n')
+        self.user.write_text(
+            'agent = "claude"\nimage = "registry.example/user"\nproviders = ["user"]\n'
+        )
         self.system.write_text('github_host = "system.example.com"\n')
-        for content, image in (("", launcher.DEFAULTS["image"]),
-                               ('image = "registry.example/local"\n', "registry.example/local")):
+        for content, image in (
+            ("", launcher.DEFAULTS["image"]),
+            ('image = "registry.example/local"\n', "registry.example/local"),
+        ):
             with self.subTest(content=content):
                 self.local.write_text(content)
                 command = self.command("--no-policy")
@@ -236,7 +287,7 @@ class DiscoveryTests(unittest.TestCase):
 
     def test_invalid_configs_at_each_location_stop_launch(self) -> None:
         for path in (self.local, self.user, self.system):
-            for content in ('image = [', 'unknown = "value"\n'):
+            for content in ("image = [", 'unknown = "value"\n'):
                 with self.subTest(path=path, content=content):
                     path.write_text(content)
                     with self.assertRaises(launcher.LauncherError):
@@ -259,32 +310,44 @@ class DiscoveryTests(unittest.TestCase):
 
     def test_invalid_utf8_and_symlink_loop_are_actionable(self) -> None:
         self.user.write_text("")
-        self.local.write_bytes(b'\xff')
-        with self.assertRaisesRegex(launcher.LauncherError, "cannot load configuration"):
+        self.local.write_bytes(b"\xff")
+        with self.assertRaisesRegex(
+            launcher.LauncherError, "cannot load configuration"
+        ):
             self.command()
         self.local.unlink()
         self.local.symlink_to(self.local)
-        with self.assertRaisesRegex(launcher.LauncherError, "cannot (resolve|inspect) configuration"):
+        with self.assertRaisesRegex(
+            launcher.LauncherError, "cannot (resolve|inspect) configuration"
+        ):
             self.command()
 
     def test_inspection_and_read_permission_errors_are_actionable(self) -> None:
         self.local.write_text("")
         self.user.write_text("")
         with mock.patch.object(Path, "lstat", side_effect=PermissionError("denied")):
-            with self.assertRaisesRegex(launcher.LauncherError, "cannot inspect configuration"):
+            with self.assertRaisesRegex(
+                launcher.LauncherError, "cannot inspect configuration"
+            ):
                 self.command()
         with mock.patch.object(Path, "stat", side_effect=PermissionError("denied")):
-            with self.assertRaisesRegex(launcher.LauncherError, "cannot inspect configuration"):
+            with self.assertRaisesRegex(
+                launcher.LauncherError, "cannot inspect configuration"
+            ):
                 self.command()
         with mock.patch.object(Path, "open", side_effect=PermissionError("denied")):
-            with self.assertRaisesRegex(launcher.LauncherError, "cannot load configuration"):
+            with self.assertRaisesRegex(
+                launcher.LauncherError, "cannot load configuration"
+            ):
                 self.command()
 
     def test_non_directory_ancestor_is_an_error(self) -> None:
         blocked = self.root / "blocked"
         blocked.write_text("")
         os.environ["XDG_CONFIG_HOME"] = str(blocked)
-        with self.assertRaisesRegex(launcher.LauncherError, "cannot inspect configuration"):
+        with self.assertRaisesRegex(
+            launcher.LauncherError, "cannot inspect configuration"
+        ):
             self.command()
 
     def test_selected_config_paths_provider_composition_and_cli_overrides(self) -> None:
@@ -303,7 +366,9 @@ class DiscoveryTests(unittest.TestCase):
         self.assertIn(str(policy), command)
         self.assertIn("common", command)
         self.assertIn("claude-api", command)
-        driver = next(value for value in command if value.startswith("--driver-config-json="))
+        driver = next(
+            value for value in command if value.startswith("--driver-config-json=")
+        )
         mounts = json.loads(driver.split("=", 1)[1])["podman"]["mounts"]
         self.assertEqual(mounts[0]["source"], str(project.parent))
         self.assertEqual(mounts[1]["source"], str(kubeconfig))
@@ -311,8 +376,14 @@ class DiscoveryTests(unittest.TestCase):
         cli_policy = self.cwd / "cli.yaml"
         cli_policy.write_text("")
         command = self.command(
-            "--image", "registry.example/cli", "--policy", "cli.yaml", "--no-kubeconfig",
-            "--provider", "replacement", str(project),
+            "--image",
+            "registry.example/cli",
+            "--policy",
+            "cli.yaml",
+            "--no-kubeconfig",
+            "--provider",
+            "replacement",
+            str(project),
         )
         self.assertIn("registry.example/cli", command)
         self.assertIn(str(cli_policy), command)
@@ -332,8 +403,10 @@ class DiscoveryTests(unittest.TestCase):
         self.assertIsNone(launcher.discover_config(None, cwd=self.cwd))
 
     def verbose_values(self, *arguments: str) -> dict[str, object]:
-        with mock.patch.object(sys, "stderr", new_callable=io.StringIO) as stderr, \
-             mock.patch.object(sys, "stdout", new_callable=io.StringIO) as stdout:
+        with (
+            mock.patch.object(sys, "stderr", new_callable=io.StringIO) as stderr,
+            mock.patch.object(sys, "stdout", new_callable=io.StringIO) as stdout,
+        ):
             self.command(*arguments)
             self.assertEqual(stdout.getvalue(), "")
         return {
@@ -347,12 +420,21 @@ class DiscoveryTests(unittest.TestCase):
     def test_verbose_aliases_defaults_and_silent_normal_launch(self) -> None:
         self.assertEqual(self.verbose_values("--no-policy"), {})
         expected = {
-            "config": "built-in defaults", "agent": "codex",
-            "model": None, "effort": None,
-            "image": launcher.DEFAULTS["image"], "providers": ["exoshell-codex"],
-            "policy": None, "kubeconfig": None, "github_host": None,
-            "gitlab_host": None, "keep": False, "no_share": False, "host_share": str(self.cwd),
-            "project": str(self.cwd), "container_project": "/workspace",
+            "config": "built-in defaults",
+            "agent": "codex",
+            "model": None,
+            "effort": None,
+            "image": launcher.DEFAULTS["image"],
+            "providers": ["exoshell-codex"],
+            "policy": None,
+            "kubeconfig": None,
+            "github_host": None,
+            "gitlab_host": None,
+            "keep": False,
+            "no_share": False,
+            "host_share": str(self.cwd),
+            "project": str(self.cwd),
+            "container_project": "/workspace",
             "skills": [],
         }
         for arguments in (("-v",), ("--verbose",), ("-v", "--verbose")):
@@ -366,7 +448,9 @@ class DiscoveryTests(unittest.TestCase):
             path.write_text('image = "registry.example/test"\n')
         for path in (self.local, self.user, self.system):
             with self.subTest(path=path):
-                self.assertEqual(self.verbose_values("-v", "--no-policy")["config"], str(path))
+                self.assertEqual(
+                    self.verbose_values("-v", "--no-policy")["config"], str(path)
+                )
                 path.unlink()
         explicit = self.cwd / "custom config.toml"
         explicit.write_text('image = "registry.example/explicit"\n')
@@ -377,7 +461,7 @@ class DiscoveryTests(unittest.TestCase):
         self.assertEqual(values["image"], "registry.example/explicit")
 
     def test_verbose_effective_paths_providers_overrides_and_clearing(self) -> None:
-        project = self.cwd / 'share with spaces' / 'project "quoted"'
+        project = self.cwd / "share with spaces" / 'project "quoted"'
         project.mkdir(parents=True)
         policy = self.user.parent / "policy.yaml"
         policy.write_text("")
@@ -398,9 +482,20 @@ class DiscoveryTests(unittest.TestCase):
         self.assertEqual(values["host_share"], str(project.parent))
         self.assertEqual(values["container_project"], '/workspace/project "quoted"')
         values = self.verbose_values(
-            "-v", "--image", "registry.example/cli", "--provider", "replacement",
-            "--keep", "--no-policy", "--no-kubeconfig", "--no-github-host",
-            "--gitlab-host", "cli.example.com", "--host-share", ".", str(project),
+            "-v",
+            "--image",
+            "registry.example/cli",
+            "--provider",
+            "replacement",
+            "--keep",
+            "--no-policy",
+            "--no-kubeconfig",
+            "--no-github-host",
+            "--gitlab-host",
+            "cli.example.com",
+            "--host-share",
+            ".",
+            str(project),
         )
         self.assertEqual(values["image"], "registry.example/cli")
         self.assertEqual(values["providers"], ["replacement"])
@@ -409,28 +504,37 @@ class DiscoveryTests(unittest.TestCase):
             self.assertIsNone(values[key])
         self.assertEqual(values["gitlab_host"], "cli.example.com")
         self.assertEqual(values["host_share"], str(self.cwd))
-        self.assertEqual(self.verbose_values("-v", "--no-providers", str(project))["providers"], [])
+        self.assertEqual(
+            self.verbose_values("-v", "--no-providers", str(project))["providers"], []
+        )
 
     def test_verbose_reports_selected_config_before_loading_failure(self) -> None:
         self.local.write_text("not valid TOML")
         with mock.patch.object(sys, "stderr", new_callable=io.StringIO) as stderr:
             with self.assertRaises(launcher.LauncherError):
                 launcher.run(["-v"], cwd=self.cwd)
-        self.assertEqual(stderr.getvalue(), f'exoshell: config = {json.dumps(str(self.local))}\n')
+        self.assertEqual(
+            stderr.getvalue(), f"exoshell: config = {json.dumps(str(self.local))}\n"
+        )
 
     def test_verbose_settings_are_flushed_before_image_and_git_checks(self) -> None:
         with mock.patch.object(sys, "stderr", new_callable=io.StringIO) as stderr:
-            def check_output(*args: object) -> mock.Mock:
-                self.assertIn('exoshell: container_project = "/workspace"\n', stderr.getvalue())
+
+            def check_output(*args: object, check: bool = False) -> mock.Mock:
+                self.assertIn(
+                    'exoshell: container_project = "/workspace"\n', stderr.getvalue()
+                )
                 return mock.Mock(returncode=0)
 
             def check_identity(project: Path) -> tuple[str, str]:
                 check_output()
                 return "Test", "test@example.com"
 
-            with mock.patch.object(launcher.subprocess, "run", side_effect=check_output), \
-                 mock.patch.object(launcher, "git_identity", side_effect=check_identity), \
-                 mock.patch.object(stderr, "flush", wraps=stderr.flush) as flush:
+            with (
+                mock.patch.object(launcher.subprocess, "run", side_effect=check_output),
+                mock.patch.object(launcher, "git_identity", side_effect=check_identity),
+                mock.patch.object(stderr, "flush", wraps=stderr.flush) as flush,
+            ):
                 self.assertEqual(launcher.run(["-v", "--no-policy"], cwd=self.cwd), 0)
             self.assertEqual(flush.call_count, 16)
 
@@ -459,7 +563,9 @@ class ResolutionTests(unittest.TestCase):
                     "claude": {"providers": ["claude-provider"]},
                 },
             }
-            settings = launcher.resolve_settings(self.parse("--agent", "claude"), config, cwd=cwd)
+            settings = launcher.resolve_settings(
+                self.parse("--agent", "claude"), config, cwd=cwd
+            )
             self.assertEqual(settings["providers"], ["common", "claude-provider"])
 
     def test_config_agent_and_keep_override(self) -> None:
@@ -474,12 +580,19 @@ class ResolutionTests(unittest.TestCase):
     def test_provider_override_and_clearing(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             cwd = Path(temporary)
-            config = {"providers": ["common"], "agents": {"codex": {"providers": ["agent"]}}}
+            config = {
+                "providers": ["common"],
+                "agents": {"codex": {"providers": ["agent"]}},
+            }
             replaced = launcher.resolve_settings(
-                self.parse("--provider", "first", "--provider", "second"), config, cwd=cwd
+                self.parse("--provider", "first", "--provider", "second"),
+                config,
+                cwd=cwd,
             )
             self.assertEqual(replaced["providers"], ["first", "second"])
-            cleared = launcher.resolve_settings(self.parse("--no-providers"), config, cwd=cwd)
+            cleared = launcher.resolve_settings(
+                self.parse("--no-providers"), config, cwd=cwd
+            )
             self.assertEqual(cleared["providers"], [])
 
     def test_duplicate_across_common_and_agent_is_rejected(self) -> None:
@@ -487,7 +600,10 @@ class ResolutionTests(unittest.TestCase):
             with self.assertRaisesRegex(launcher.LauncherError, "duplicate provider"):
                 launcher.resolve_settings(
                     self.parse(),
-                    {"providers": ["same"], "agents": {"codex": {"providers": ["same"]}}},
+                    {
+                        "providers": ["same"],
+                        "agents": {"codex": {"providers": ["same"]}},
+                    },
                     cwd=Path(temporary),
                 )
 
@@ -508,10 +624,14 @@ class ResolutionTests(unittest.TestCase):
                 self.parse("--github-host", "cli.github.example.com"), config, cwd=cwd
             )
             self.assertEqual(overridden["github_host"], "cli.github.example.com")
-            cleared = launcher.resolve_settings(self.parse("--no-github-host"), config, cwd=cwd)
+            cleared = launcher.resolve_settings(
+                self.parse("--no-github-host"), config, cwd=cwd
+            )
             self.assertIsNone(cleared["github_host"])
             with self.assertRaisesRegex(launcher.LauncherError, "invalid GitHub host"):
-                launcher.resolve_settings(self.parse("--github-host", "bad host"), {}, cwd=cwd)
+                launcher.resolve_settings(
+                    self.parse("--github-host", "bad host"), {}, cwd=cwd
+                )
 
     def test_nested_symlink_and_spaces_translate(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
@@ -524,7 +644,9 @@ class ResolutionTests(unittest.TestCase):
             settings = launcher.resolve_settings(
                 self.parse("--host-share", str(share), str(link)), {}, cwd=root
             )
-            self.assertEqual(settings["container_project"], "/workspace/nested/project with spaces")
+            self.assertEqual(
+                settings["container_project"], "/workspace/nested/project with spaces"
+            )
 
     def test_outside_share_is_rejected(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
@@ -552,51 +674,108 @@ class NoShareTests(unittest.TestCase):
     def arguments(self, *extra: str) -> list[str]:
         return ["--config", str(self.config), "--no-share", "--no-policy", *extra]
 
-    def test_each_agent_uses_disposable_workspace_and_preserves_launch_options(self) -> None:
+    def test_each_agent_uses_disposable_workspace_and_preserves_launch_options(
+        self,
+    ) -> None:
         for agent in launcher.AGENTS:
             for keep in (False, True):
-                with self.subTest(agent=agent, keep=keep), \
-                     mock.patch.object(launcher, "git_identity", return_value=(None, None)) as identity, \
-                     mock.patch.object(launcher.subprocess, "run", return_value=mock.Mock(returncode=17)) as execute, \
-                     mock.patch.object(sys, "stderr", new_callable=io.StringIO) as stderr:
+                with (
+                    self.subTest(agent=agent, keep=keep),
+                    mock.patch.object(
+                        launcher, "git_identity", return_value=(None, None)
+                    ) as identity,
+                    mock.patch.object(
+                        launcher.subprocess,
+                        "run",
+                        return_value=mock.Mock(returncode=17),
+                    ) as execute,
+                    mock.patch.object(
+                        sys, "stderr", new_callable=io.StringIO
+                    ) as stderr,
+                ):
                     flags = ["--agent", agent, "--no-kubeconfig", "-v"]
                     if keep:
                         flags.append("--keep")
-                    self.assertEqual(launcher.run(
-                        self.arguments(*flags, "--", "--model", "example-model"), cwd=self.root,
-                    ), 17)
+                    self.assertEqual(
+                        launcher.run(
+                            self.arguments(*flags, "--", "--model", "example-model"),
+                            cwd=self.root,
+                        ),
+                        17,
+                    )
                     identity.assert_called_once_with(None)
                     execute.assert_called_once()
                     command = execute.call_args.args[0]
-                    driver = next(arg for arg in command if arg.startswith("--driver-config-json="))
-                    self.assertEqual(json.loads(driver.split("=", 1)[1]), {
-                        "podman": {"mounts": [{"type": "tmpfs", "target": "/tmp/gws", "mode": 0o777}]},
-                    })
-                    self.assertEqual(command[-6:], [
-                        "/usr/local/bin/exoshell-agent", "/workspace", "--", agent,
-                        "--model", "example-model",
-                    ])
+                    driver = next(
+                        arg
+                        for arg in command
+                        if arg.startswith("--driver-config-json=")
+                    )
+                    self.assertEqual(
+                        json.loads(driver.split("=", 1)[1]),
+                        {
+                            "podman": {
+                                "mounts": [
+                                    {
+                                        "type": "tmpfs",
+                                        "target": "/tmp/gws",
+                                        "mode": 0o777,
+                                    }
+                                ]
+                            },
+                        },
+                    )
+                    self.assertEqual(
+                        command[-6:],
+                        [
+                            "/usr/local/bin/exoshell-agent",
+                            "/workspace",
+                            "--",
+                            agent,
+                            "--model",
+                            "example-model",
+                        ],
+                    )
                     self.assertEqual("--no-keep" in command, not keep)
                     self.assertIn("project=ephemeral", command)
                     self.assertIn("forge", command)
-                    self.assertFalse(any(arg.startswith("KUBECONFIG=") for arg in command))
-                    self.assertFalse(any(arg.startswith("GIT_AUTHOR_") for arg in command))
+                    self.assertFalse(
+                        any(arg.startswith("KUBECONFIG=") for arg in command)
+                    )
+                    self.assertFalse(
+                        any(arg.startswith("GIT_AUTHOR_") for arg in command)
+                    )
                     for key in ("host_share", "project", "kubeconfig"):
                         self.assertIn(f"exoshell: {key} = null\n", stderr.getvalue())
                     self.assertIn("exoshell: no_share = true\n", stderr.getvalue())
 
     def test_conflicting_explicit_arguments_fail_before_subprocesses(self) -> None:
-        for extra in (("--host-share", "/missing"), ("--kubeconfig", "/missing"), ("/missing",)):
-            with self.subTest(extra=extra), mock.patch.object(launcher.subprocess, "run") as execute:
-                with self.assertRaisesRegex(launcher.LauncherError, "--no-share cannot be combined"):
+        for extra in (
+            ("--host-share", "/missing"),
+            ("--kubeconfig", "/missing"),
+            ("/missing",),
+        ):
+            with (
+                self.subTest(extra=extra),
+                mock.patch.object(launcher.subprocess, "run") as execute,
+            ):
+                with self.assertRaisesRegex(
+                    launcher.LauncherError, "--no-share cannot be combined"
+                ):
                     launcher.run(self.arguments(*extra), cwd=self.root)
                 execute.assert_not_called()
 
     def test_policy_is_still_required_and_validated(self) -> None:
         args = self.arguments()
         args.remove("--no-policy")
-        for extra, message in (([], "no sandbox policy selected"), (["--policy", "/missing"], "policy file")):
-            with self.subTest(extra=extra), mock.patch.object(launcher.subprocess, "run") as execute:
+        for extra, message in (
+            ([], "no sandbox policy selected"),
+            (["--policy", "/missing"], "policy file"),
+        ):
+            with (
+                self.subTest(extra=extra),
+                mock.patch.object(launcher.subprocess, "run") as execute,
+            ):
                 with self.assertRaisesRegex(launcher.LauncherError, message):
                     launcher.run([*args, *extra], cwd=self.root)
                 execute.assert_not_called()
@@ -604,33 +783,71 @@ class NoShareTests(unittest.TestCase):
     def test_optional_global_identity(self) -> None:
         missing = subprocess.CalledProcessError(1, ["git"])
         for values, expected in (
-            (["Global User\n", "global@example.com\n"], ("Global User", "global@example.com")),
+            (
+                ["Global User\n", "global@example.com\n"],
+                ("Global User", "global@example.com"),
+            ),
             ([missing], (None, None)),
             (["Global User\n", missing], (None, None)),
             (["\n"], (None, None)),
             (["Global User\n", "\n"], (None, None)),
             ([FileNotFoundError()], (None, None)),
         ):
-            results = [mock.Mock(stdout=value) if isinstance(value, str) else value for value in values]
-            with self.subTest(values=values), mock.patch.object(launcher.subprocess, "run", side_effect=results) as execute:
+            results = [
+                mock.Mock(stdout=value) if isinstance(value, str) else value
+                for value in values
+            ]
+            with (
+                self.subTest(values=values),
+                mock.patch.object(
+                    launcher.subprocess, "run", side_effect=results
+                ) as execute,
+            ):
                 self.assertEqual(launcher.git_identity(None), expected)
-                for call, key in zip(execute.call_args_list, ("user.name", "user.email")):
-                    self.assertEqual(call.args[0], ["git", "config", "--global", "--get", key])
-        with mock.patch.object(launcher.subprocess, "run", side_effect=subprocess.CalledProcessError(128, ["git"])):
-            with self.assertRaisesRegex(launcher.LauncherError, "cannot read global Git"):
+                for call, key in zip(
+                    execute.call_args_list, ("user.name", "user.email")
+                ):
+                    self.assertEqual(
+                        call.args[0], ["git", "config", "--global", "--get", key]
+                    )
+        with mock.patch.object(
+            launcher.subprocess,
+            "run",
+            side_effect=subprocess.CalledProcessError(128, ["git"]),
+        ):
+            with self.assertRaisesRegex(
+                launcher.LauncherError, "cannot read global Git"
+            ):
                 launcher.git_identity(None)
 
     def test_forge_configuration_without_identity(self) -> None:
-        settings = {**launcher.DEFAULTS, "github_host": "github.example.com", "gitlab_host": "gitlab.example.com"}
+        settings = {
+            **launcher.DEFAULTS,
+            "github_host": "github.example.com",
+            "gitlab_host": "gitlab.example.com",
+        }
         environment = launcher.environment_args(settings, None, None)[1::2]
         self.assertIn("GH_HOST=github.example.com", environment)
         self.assertIn("GITLAB_HOST=gitlab.example.com", environment)
         self.assertIn("GIT_CONFIG_COUNT=4", environment)
-        self.assertIn("GIT_CONFIG_KEY_0=credential.https://github.example.com.helper", environment)
-        self.assertIn("GIT_CONFIG_KEY_2=credential.https://gitlab.example.com.helper", environment)
-        self.assertFalse(any(arg.startswith(("GIT_AUTHOR_", "GIT_COMMITTER_")) for arg in environment))
-        self.assertFalse(any(arg.endswith(("=user.name", "=user.email")) for arg in environment))
-        self.assertIn("GIT_CONFIG_COUNT=0", launcher.environment_args(launcher.DEFAULTS, None, None))
+        self.assertIn(
+            "GIT_CONFIG_KEY_0=credential.https://github.example.com.helper", environment
+        )
+        self.assertIn(
+            "GIT_CONFIG_KEY_2=credential.https://gitlab.example.com.helper", environment
+        )
+        self.assertFalse(
+            any(
+                arg.startswith(("GIT_AUTHOR_", "GIT_COMMITTER_")) for arg in environment
+            )
+        )
+        self.assertFalse(
+            any(arg.endswith(("=user.name", "=user.email")) for arg in environment)
+        )
+        self.assertIn(
+            "GIT_CONFIG_COUNT=0",
+            launcher.environment_args(launcher.DEFAULTS, None, None),
+        )
 
 
 class OverlayBasePolicyTests(unittest.TestCase):
@@ -669,20 +886,31 @@ class CommandTests(unittest.TestCase):
             with self.subTest(agent=agent), tempfile.TemporaryDirectory() as temporary:
                 settings = self.settings(Path(temporary), agent)
                 mounts = launcher.mount_config(settings)["podman"]["mounts"]
-                self.assertEqual([mount["target"] for mount in mounts], ["/workspace", "/tmp/gws"])
+                self.assertEqual(
+                    [mount["target"] for mount in mounts], ["/workspace", "/tmp/gws"]
+                )
                 command = launcher.create_command(
-                    settings, ["--model", "model with spaces", "$(touch nope)"], "A User", "a@example.com"
+                    settings,
+                    ["--model", "model with spaces", "$(touch nope)"],
+                    "A User",
+                    "a@example.com",
                 )
                 self.assertEqual(
                     command[-7:-4],
                     ["/usr/local/bin/exoshell-agent", "/workspace/project", "--"],
                 )
                 self.assertEqual(command[-4], executable)
-                self.assertEqual(command[-3:], ["--model", "model with spaces", "$(touch nope)"])
+                self.assertEqual(
+                    command[-3:], ["--model", "model with spaces", "$(touch nope)"]
+                )
                 self.assertNotIn("/bin/bash", command)
                 self.assertIn("--no-keep", command)
                 self.assertNotIn("--name", command)
-                labels = [command[index + 1] for index, value in enumerate(command) if value == "--label"]
+                labels = [
+                    command[index + 1]
+                    for index, value in enumerate(command)
+                    if value == "--label"
+                ]
                 self.assertEqual(
                     labels,
                     ["managed-by=exoshell", "project=project", f"agent={agent}"],
@@ -699,10 +927,15 @@ class CommandTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temporary:
             settings = self.settings(Path(temporary), "opencode")
             mounts = launcher.mount_config(settings)["podman"]["mounts"]
-            self.assertEqual(mounts[-1], {"type": "tmpfs", "target": "/tmp/gws", "mode": 0o777})
+            self.assertEqual(
+                mounts[-1], {"type": "tmpfs", "target": "/tmp/gws", "mode": 0o777}
+            )
             environment = launcher.environment_args(settings, "A User", "a@example.com")
             self.assertNotIn("EXOSHELL_GWS=1", environment)
-            self.assertNotIn("GOOGLE_WORKSPACE_CLI_CREDENTIALS_FILE=/tmp/gws/credentials.json", environment)
+            self.assertNotIn(
+                "GOOGLE_WORKSPACE_CLI_CREDENTIALS_FILE=/tmp/gws/credentials.json",
+                environment,
+            )
 
     def test_github_and_gitlab_hosts_configure_cli_and_git(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
@@ -715,13 +948,17 @@ class CommandTests(unittest.TestCase):
             self.assertIn("GITLAB_HOST=gitlab.example.com", environment)
             self.assertIn("GIT_CONFIG_COUNT=6", environment)
             self.assertIn(
-                "GIT_CONFIG_KEY_2=credential.https://github.example.com.helper", environment
+                "GIT_CONFIG_KEY_2=credential.https://github.example.com.helper",
+                environment,
             )
             self.assertIn(
                 "GIT_CONFIG_VALUE_2=!/usr/bin/gh auth git-credential", environment
             )
             self.assertIn("GIT_CONFIG_VALUE_3=git@github.example.com:", environment)
-            self.assertIn("GIT_CONFIG_KEY_4=credential.https://gitlab.example.com.helper", environment)
+            self.assertIn(
+                "GIT_CONFIG_KEY_4=credential.https://gitlab.example.com.helper",
+                environment,
+            )
             self.assertIn("GIT_CONFIG_VALUE_5=git@gitlab.example.com:", environment)
 
     def test_project_label_normalization_truncation_and_fallback(self) -> None:
@@ -732,7 +969,9 @@ class CommandTests(unittest.TestCase):
         }
         for basename, expected in cases.items():
             with self.subTest(basename=basename):
-                self.assertEqual(launcher.project_label(Path("/tmp") / basename), expected)
+                self.assertEqual(
+                    launcher.project_label(Path("/tmp") / basename), expected
+                )
 
 
 class LauncherIntegrationTests(unittest.TestCase):
@@ -744,45 +983,76 @@ class LauncherIntegrationTests(unittest.TestCase):
         binaries = root / "bin"
         binaries.mkdir()
         capture = root / "openshell.args"
-        self.executable(binaries / "podman", '[[ "$*" == "image exists localhost/test-image:latest" ]]\n')
+        self.executable(
+            binaries / "podman",
+            '[[ "$*" == "image exists localhost/test-image:latest" ]]\n',
+        )
         self.executable(
             binaries / "git",
             'case "${!#}" in user.name) printf "%s\\n" "Test User";; user.email) printf "%s\\n" "test@example.com";; *) exit 1;; esac\n',
         )
         self.executable(binaries / "openshell", 'printf "%s\\n" "$@" > "$CAPTURE"\n')
         environment = os.environ.copy()
-        environment.update({
-            "PATH": f"{binaries}:{environment['PATH']}", "CAPTURE": str(capture),
-            "HOME": str(root / "home"), "XDG_CONFIG_HOME": str(root / "xdg"),
-        })
+        environment.update(
+            {
+                "PATH": f"{binaries}:{environment['PATH']}",
+                "CAPTURE": str(capture),
+                "HOME": str(root / "home"),
+                "XDG_CONFIG_HOME": str(root / "xdg"),
+            }
+        )
         return environment, capture, binaries
 
-    def test_no_share_wrapper_with_complete_missing_and_partial_global_identity(self) -> None:
-        for name, email in (("Global User", "global@example.com"), ("", ""), ("Global User", "")):
-            with self.subTest(name=name, email=email), tempfile.TemporaryDirectory() as temporary:
+    def test_no_share_wrapper_with_complete_missing_and_partial_global_identity(
+        self,
+    ) -> None:
+        for name, email in (
+            ("Global User", "global@example.com"),
+            ("", ""),
+            ("Global User", ""),
+        ):
+            with (
+                self.subTest(name=name, email=email),
+                tempfile.TemporaryDirectory() as temporary,
+            ):
                 root = Path(temporary)
                 environment, capture, binaries = self.fake_environment(root)
                 environment.update(TEST_GIT_NAME=name, TEST_GIT_EMAIL=email)
-                self.executable(binaries / "git", (
-                    '[[ "$1 $2 $3" == "config --global --get" ]] || exit 128\n'
-                    'case "$4" in user.name) value="$TEST_GIT_NAME";; '
-                    'user.email) value="$TEST_GIT_EMAIL";; *) exit 128;; esac\n'
-                    '[[ -n "$value" ]] || exit 1\nprintf "%s\\n" "$value"\n'
-                ))
+                self.executable(
+                    binaries / "git",
+                    (
+                        '[[ "$1 $2 $3" == "config --global --get" ]] || exit 128\n'
+                        'case "$4" in user.name) value="$TEST_GIT_NAME";; '
+                        'user.email) value="$TEST_GIT_EMAIL";; *) exit 128;; esac\n'
+                        '[[ -n "$value" ]] || exit 1\nprintf "%s\\n" "$value"\n'
+                    ),
+                )
                 config = root / "launcher.toml"
                 config.write_text(
                     'image = "localhost/test-image:latest"\nhost_share = "missing"\n'
                     'kubeconfig = "missing"\ngitlab_host = "gitlab.example.com"\n'
                 )
                 result = subprocess.run(
-                    [str(ROOT / "run-exoshell-agent.sh"), "--config", str(config),
-                     "--no-share", "--no-policy"],
-                    cwd=root, env=environment, capture_output=True, text=True,
+                    [
+                        str(ROOT / "run-exoshell-agent.sh"),
+                        "--config",
+                        str(config),
+                        "--no-share",
+                        "--no-policy",
+                    ],
+                    check=False,
+                    cwd=root,
+                    env=environment,
+                    capture_output=True,
+                    text=True,
                 )
                 self.assertEqual(result.returncode, 0, result.stderr)
                 command = capture.read_text().splitlines()
                 self.assertIn("GITLAB_HOST=gitlab.example.com", command)
-                self.assertEqual(command[-4:], ["/usr/local/bin/exoshell-agent", "/workspace", "--", "codex"])
+                self.assertEqual(
+                    command[-4:],
+                    ["/usr/local/bin/exoshell-agent", "/workspace", "--", "codex"],
+                )
                 self.assertIn("project=ephemeral", command)
                 self.assertIn("--no-keep", command)
                 if name and email:
@@ -790,10 +1060,17 @@ class LauncherIntegrationTests(unittest.TestCase):
                     self.assertIn(f"GIT_COMMITTER_EMAIL={email}", command)
                     self.assertIn("GIT_CONFIG_COUNT=4", command)
                 else:
-                    self.assertFalse(any(arg.startswith(("GIT_AUTHOR_", "GIT_COMMITTER_")) for arg in command))
+                    self.assertFalse(
+                        any(
+                            arg.startswith(("GIT_AUTHOR_", "GIT_COMMITTER_"))
+                            for arg in command
+                        )
+                    )
                     self.assertIn("GIT_CONFIG_COUNT=2", command)
 
-    def test_verbose_wrapper_preserves_command_and_agent_argument_forwarding(self) -> None:
+    def test_verbose_wrapper_preserves_command_and_agent_argument_forwarding(
+        self,
+    ) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
             environment, capture, _ = self.fake_environment(root)
@@ -803,17 +1080,37 @@ class LauncherIntegrationTests(unittest.TestCase):
             commands = []
             for flags in ([], ["-v"], ["--verbose"]):
                 result = subprocess.run(
-                    [str(ROOT / "run-exoshell-agent.sh"), "--config", str(config),
-                     *flags, "--no-policy", "--", "-v", "--verbose", "private agent argument"],
-                    cwd=root, env=environment, capture_output=True, text=True,
+                    [
+                        str(ROOT / "run-exoshell-agent.sh"),
+                        "--config",
+                        str(config),
+                        *flags,
+                        "--no-policy",
+                        "--",
+                        "-v",
+                        "--verbose",
+                        "private agent argument",
+                    ],
+                    check=False,
+                    cwd=root,
+                    env=environment,
+                    capture_output=True,
+                    text=True,
                 )
                 self.assertEqual(result.returncode, 0, result.stderr)
                 self.assertEqual(result.stdout, "")
                 commands.append(capture.read_text().splitlines())
-                self.assertEqual(commands[-1][-3:], ["-v", "--verbose", "private agent argument"])
+                self.assertEqual(
+                    commands[-1][-3:], ["-v", "--verbose", "private agent argument"]
+                )
                 if flags:
-                    self.assertIn(f'exoshell: config = {json.dumps(str(config))}\n', result.stderr)
-                    self.assertIn('exoshell: image = "localhost/test-image:latest"\n', result.stderr)
+                    self.assertIn(
+                        f"exoshell: config = {json.dumps(str(config))}\n", result.stderr
+                    )
+                    self.assertIn(
+                        'exoshell: image = "localhost/test-image:latest"\n',
+                        result.stderr,
+                    )
                     self.assertNotIn("private agent argument", result.stderr)
                     self.assertNotIn(environment["EXOSHELL_TEST_SECRET"], result.stderr)
                 else:
@@ -829,14 +1126,16 @@ class LauncherIntegrationTests(unittest.TestCase):
             shutil.copy2(ROOT / "run-exoshell-agent.sh", checkout)
             shutil.copy2(ROOT / "scripts/exoshell_agent.py", checkout / "scripts")
             # These must be ignored even though both locations contain configs.
-            checkout.joinpath(".exoshell.local.toml").write_text('unknown = true\n')
+            checkout.joinpath(".exoshell.local.toml").write_text("unknown = true\n")
             project = root / "project"
             project.mkdir()
-            project.joinpath(".exoshell.local.toml").write_text('unknown = true\n')
+            project.joinpath(".exoshell.local.toml").write_text("unknown = true\n")
             caller = root / "caller"
             caller.mkdir()
             environment, capture, _ = self.fake_environment(root)
-            user_config = Path(environment["XDG_CONFIG_HOME"]) / "exoshell/exoshell.local.toml"
+            user_config = (
+                Path(environment["XDG_CONFIG_HOME"]) / "exoshell/exoshell.local.toml"
+            )
             user_config.parent.mkdir(parents=True)
             user_config.write_text('image = "registry.example/user"\n')
             local_config = caller / ".exoshell.local.toml"
@@ -844,8 +1143,16 @@ class LauncherIntegrationTests(unittest.TestCase):
             for expected in ("localhost/test-image:latest", "registry.example/user"):
                 with self.subTest(expected=expected):
                     result = subprocess.run(
-                        [str(checkout / "run-exoshell-agent.sh"), "--no-policy", str(project)],
-                        cwd=caller, env=environment, capture_output=True, text=True,
+                        [
+                            str(checkout / "run-exoshell-agent.sh"),
+                            "--no-policy",
+                            str(project),
+                        ],
+                        check=False,
+                        cwd=caller,
+                        env=environment,
+                        capture_output=True,
+                        text=True,
                     )
                     self.assertEqual(result.returncode, 0, result.stderr)
                     arguments = capture.read_text().splitlines()
@@ -878,10 +1185,21 @@ class LauncherIntegrationTests(unittest.TestCase):
             environment, capture, _ = self.fake_environment(root)
             result = subprocess.run(
                 [
-                    str(ROOT / "run-exoshell-agent.sh"), "--config", str(config), "--agent", "opencode",
-                    str(project), "--", "--model", "model with spaces",
+                    str(ROOT / "run-exoshell-agent.sh"),
+                    "--config",
+                    str(config),
+                    "--agent",
+                    "opencode",
+                    str(project),
+                    "--",
+                    "--model",
+                    "model with spaces",
                 ],
-                cwd=root, env=environment, capture_output=True, text=True,
+                check=False,
+                cwd=root,
+                env=environment,
+                capture_output=True,
+                text=True,
             )
             self.assertEqual(result.returncode, 0, result.stderr)
             arguments = capture.read_text().splitlines()
@@ -892,13 +1210,21 @@ class LauncherIntegrationTests(unittest.TestCase):
             self.assertIn("opencode", arguments)
             self.assertIn("--no-keep", arguments)
             self.assertNotIn("--name", arguments)
-            labels = [arguments[index + 1] for index, value in enumerate(arguments) if value == "--label"]
+            labels = [
+                arguments[index + 1]
+                for index, value in enumerate(arguments)
+                if value == "--label"
+            ]
             self.assertEqual(
                 labels,
                 ["managed-by=exoshell", "project=project", "agent=opencode"],
             )
             self.assertEqual(arguments[-2:], ["--model", "model with spaces"])
-            driver = next(value for value in arguments if value.startswith("--driver-config-json="))
+            driver = next(
+                value
+                for value in arguments
+                if value.startswith("--driver-config-json=")
+            )
             mount_data = json.loads(driver.split("=", 1)[1])
             self.assertEqual(
                 [mount["target"] for mount in mount_data["podman"]["mounts"][1:]],
@@ -909,7 +1235,9 @@ class LauncherIntegrationTests(unittest.TestCase):
 class ImageStartupTests(unittest.TestCase):
     HELPER = ROOT / "sandboxes/exoshell-base/exoshell-agent"
 
-    @unittest.skipUnless(os.access("/workspace", os.W_OK), "writable /workspace is required")
+    @unittest.skipUnless(
+        os.access("/workspace", os.W_OK), "writable /workspace is required"
+    )
     def test_project_argv_and_exit_status_without_gws(self) -> None:
         with tempfile.TemporaryDirectory(dir="/workspace") as temporary:
             project = Path(temporary) / "project with spaces"
@@ -918,20 +1246,45 @@ class ImageStartupTests(unittest.TestCase):
             for key in ("GWS_CLIENT_ID", "GWS_CLIENT_SECRET", "GWS_REFRESH_TOKEN"):
                 environment.pop(key, None)
             result = subprocess.run(
-                [str(self.HELPER), str(project), "--", sys.executable, "-c",
-                 "import json,os,sys; print(json.dumps([os.getcwd(),sys.argv[1:]]))",
-                 "model with spaces", "$(touch nope)"],
-                env=environment, capture_output=True, text=True,
+                [
+                    str(self.HELPER),
+                    str(project),
+                    "--",
+                    sys.executable,
+                    "-c",
+                    "import json,os,sys; print(json.dumps([os.getcwd(),sys.argv[1:]]))",
+                    "model with spaces",
+                    "$(touch nope)",
+                ],
+                check=False,
+                env=environment,
+                capture_output=True,
+                text=True,
             )
             self.assertEqual(result.returncode, 0, result.stderr)
-            self.assertEqual(json.loads(result.stdout), [str(project), ["model with spaces", "$(touch nope)"]])
+            self.assertEqual(
+                json.loads(result.stdout),
+                [str(project), ["model with spaces", "$(touch nope)"]],
+            )
             status = subprocess.run(
-                [str(self.HELPER), str(project), "--", sys.executable, "-c", "import sys; sys.exit(17)"],
-                env=environment, capture_output=True, text=True,
+                [
+                    str(self.HELPER),
+                    str(project),
+                    "--",
+                    sys.executable,
+                    "-c",
+                    "import sys; sys.exit(17)",
+                ],
+                check=False,
+                env=environment,
+                capture_output=True,
+                text=True,
             )
             self.assertEqual(status.returncode, 17)
 
-    @unittest.skipUnless(os.access("/workspace", os.W_OK), "writable /workspace is required")
+    @unittest.skipUnless(
+        os.access("/workspace", os.W_OK), "writable /workspace is required"
+    )
     def test_rejects_project_outside_workspace_and_symlink_escape(self) -> None:
         with tempfile.TemporaryDirectory(dir="/workspace") as temporary:
             escape = Path(temporary) / "escape"
@@ -940,12 +1293,16 @@ class ImageStartupTests(unittest.TestCase):
                 with self.subTest(project=project):
                     result = subprocess.run(
                         [str(self.HELPER), project, "--", "/bin/true"],
-                        capture_output=True, text=True,
+                        check=False,
+                        capture_output=True,
+                        text=True,
                     )
                     self.assertEqual(result.returncode, 2)
                     self.assertIn("PROJECT", result.stderr)
 
-    @unittest.skipUnless(os.access("/workspace", os.W_OK), "writable /workspace is required")
+    @unittest.skipUnless(
+        os.access("/workspace", os.W_OK), "writable /workspace is required"
+    )
     def test_partial_gws_environment_fails_before_running_command(self) -> None:
         with tempfile.TemporaryDirectory(dir="/workspace") as temporary:
             marker = Path(temporary) / "started"
@@ -954,28 +1311,55 @@ class ImageStartupTests(unittest.TestCase):
                 environment.pop(key, None)
             environment["GWS_REFRESH_TOKEN"] = "sensitive-value"
             result = subprocess.run(
-                [str(self.HELPER), temporary, "--", sys.executable, "-c",
-                 "from pathlib import Path; import sys; Path(sys.argv[1]).touch()", str(marker)],
-                env=environment, capture_output=True, text=True,
+                [
+                    str(self.HELPER),
+                    temporary,
+                    "--",
+                    sys.executable,
+                    "-c",
+                    "from pathlib import Path; import sys; Path(sys.argv[1]).touch()",
+                    str(marker),
+                ],
+                check=False,
+                env=environment,
+                capture_output=True,
+                text=True,
             )
             self.assertEqual(result.returncode, 2)
             self.assertIn("GWS_CLIENT_ID", result.stderr)
             self.assertNotIn("sensitive-value", result.stderr)
             self.assertFalse(marker.exists())
 
-    def test_absent_or_empty_gws_values_skip_without_storage_or_environment_changes(self) -> None:
+    def test_absent_or_empty_gws_values_skip_without_storage_or_environment_changes(
+        self,
+    ) -> None:
         initialize_gws = runpy.run_path(str(self.HELPER))["initialize_gws"]
-        for credentials in ({}, dict.fromkeys(("GWS_CLIENT_ID", "GWS_CLIENT_SECRET", "GWS_REFRESH_TOKEN"), "")):
-            with self.subTest(credentials=credentials), tempfile.TemporaryDirectory() as temporary:
+        for credentials in (
+            {},
+            dict.fromkeys(
+                ("GWS_CLIENT_ID", "GWS_CLIENT_SECRET", "GWS_REFRESH_TOKEN"), ""
+            ),
+        ):
+            with (
+                self.subTest(credentials=credentials),
+                tempfile.TemporaryDirectory() as temporary,
+            ):
                 directory = Path(temporary) / "missing"
-                environment = {**credentials, "GOOGLE_WORKSPACE_CLI_CONFIG_DIR": "/custom/config"}
+                environment = {
+                    **credentials,
+                    "GOOGLE_WORKSPACE_CLI_CONFIG_DIR": "/custom/config",
+                }
                 expected = environment.copy()
                 initialize_gws(environment, directory)
                 self.assertFalse(directory.exists())
                 self.assertEqual(environment, expected)
 
-    @unittest.skipUnless(os.access("/workspace", os.W_OK), "writable /workspace is required")
-    def test_complete_gws_environment_initializes_before_exec_without_opt_in(self) -> None:
+    @unittest.skipUnless(
+        os.access("/workspace", os.W_OK), "writable /workspace is required"
+    )
+    def test_complete_gws_environment_initializes_before_exec_without_opt_in(
+        self,
+    ) -> None:
         startup = runpy.run_path(str(self.HELPER))
         main = startup["main"]
         initialize_gws = startup["initialize_gws"]
@@ -983,20 +1367,37 @@ class ImageStartupTests(unittest.TestCase):
             project = Path(temporary).resolve()
             directory = project / "gws"
             directory.mkdir()
-            environment = {key: f"openshell:resolve:env:{key}" for key in startup["GWS_KEYS"]}
-            with mock.patch.dict(os.environ, environment, clear=True), \
-                 mock.patch.dict(main.__globals__, {"initialize_gws": lambda env: initialize_gws(env, directory)}), \
-                 mock.patch("os.chdir") as chdir, mock.patch("os.execvpe") as execute:
+            environment = {
+                key: f"openshell:resolve:env:{key}" for key in startup["GWS_KEYS"]
+            }
+            with (
+                mock.patch.dict(os.environ, environment, clear=True),
+                mock.patch.dict(
+                    main.__globals__,
+                    {"initialize_gws": lambda env: initialize_gws(env, directory)},
+                ),
+                mock.patch("os.chdir") as chdir,
+                mock.patch("os.execvpe") as execute,
+            ):
                 main([str(project), "--", "/bin/true", "argument with spaces"])
             chdir.assert_called_once_with(project)
             command, arguments, child_environment = execute.call_args.args
             self.assertEqual(command, "/bin/true")
             self.assertEqual(arguments, ["/bin/true", "argument with spaces"])
-            self.assertEqual(child_environment["GOOGLE_WORKSPACE_CLI_CREDENTIALS_FILE"],
-                             str(directory / "credentials.json"))
-            self.assertEqual(child_environment["GOOGLE_WORKSPACE_CLI_CONFIG_DIR"], str(directory / "config"))
-            self.assertEqual(json.loads((directory / "credentials.json").read_text())["refresh_token"],
-                             environment["GWS_REFRESH_TOKEN"])
+            self.assertEqual(
+                child_environment["GOOGLE_WORKSPACE_CLI_CREDENTIALS_FILE"],
+                str(directory / "credentials.json"),
+            )
+            self.assertEqual(
+                child_environment["GOOGLE_WORKSPACE_CLI_CONFIG_DIR"],
+                str(directory / "config"),
+            )
+            self.assertEqual(
+                json.loads((directory / "credentials.json").read_text())[
+                    "refresh_token"
+                ],
+                environment["GWS_REFRESH_TOKEN"],
+            )
 
     def test_gws_credentials_are_valid_private_json(self) -> None:
         initialize_gws = runpy.run_path(str(self.HELPER))["initialize_gws"]
@@ -1012,9 +1413,12 @@ class ImageStartupTests(unittest.TestCase):
             credentials = directory / "credentials.json"
             self.assertEqual(
                 json.loads(credentials.read_text()),
-                {"type": "authorized_user", "client_id": values["GWS_CLIENT_ID"],
-                 "client_secret": values["GWS_CLIENT_SECRET"],
-                 "refresh_token": values["GWS_REFRESH_TOKEN"]},
+                {
+                    "type": "authorized_user",
+                    "client_id": values["GWS_CLIENT_ID"],
+                    "client_secret": values["GWS_CLIENT_SECRET"],
+                    "refresh_token": values["GWS_REFRESH_TOKEN"],
+                },
             )
             self.assertEqual(credentials.stat().st_mode & 0o777, 0o600)
             config_dir = directory / "config"
@@ -1022,7 +1426,9 @@ class ImageStartupTests(unittest.TestCase):
             self.assertEqual(config_dir.stat().st_mode & 0o777, 0o700)
             self.assertEqual(directory.stat().st_mode & 0o777, 0o777)
             self.assertEqual(values["GOOGLE_WORKSPACE_CLI_CONFIG_DIR"], str(config_dir))
-            self.assertEqual(values["GOOGLE_WORKSPACE_CLI_CREDENTIALS_FILE"], str(credentials))
+            self.assertEqual(
+                values["GOOGLE_WORKSPACE_CLI_CREDENTIALS_FILE"], str(credentials)
+            )
             self.assertEqual(set(directory.iterdir()), {config_dir, credentials})
 
             config_dir.chmod(0o755)
@@ -1033,7 +1439,10 @@ class ImageStartupTests(unittest.TestCase):
         initialize_gws = runpy.run_path(str(self.HELPER))["initialize_gws"]
         with tempfile.TemporaryDirectory() as temporary:
             values = {"GWS_CLIENT_ID": "sensitive-value", "GWS_CLIENT_SECRET": ""}
-            with mock.patch("sys.stderr") as stderr, self.assertRaises(SystemExit) as error:
+            with (
+                mock.patch("sys.stderr") as stderr,
+                self.assertRaises(SystemExit) as error,
+            ):
                 initialize_gws(values, Path(temporary))
             self.assertEqual(error.exception.code, 2)
             message = "".join(str(call) for call in stderr.write.call_args_list)
@@ -1046,11 +1455,17 @@ class ImageStartupTests(unittest.TestCase):
         initialize_gws = runpy.run_path(str(self.HELPER))["initialize_gws"]
         with tempfile.TemporaryDirectory() as temporary:
             directory = Path(temporary)
-            values = dict.fromkeys(("GWS_CLIENT_ID", "GWS_CLIENT_SECRET", "GWS_REFRESH_TOKEN"), "opaque")
-            with mock.patch("os.replace", side_effect=OSError("failed")), \
-                 mock.patch("sys.stderr"), self.assertRaises(SystemExit):
+            values = dict.fromkeys(
+                ("GWS_CLIENT_ID", "GWS_CLIENT_SECRET", "GWS_REFRESH_TOKEN"), "opaque"
+            )
+            with (
+                mock.patch("os.replace", side_effect=OSError("failed")),
+                mock.patch("sys.stderr"),
+                self.assertRaises(SystemExit),
+            ):
                 initialize_gws(values, directory)
             self.assertEqual(list(directory.iterdir()), [directory / "config"])
+
 
 if __name__ == "__main__":
     unittest.main()

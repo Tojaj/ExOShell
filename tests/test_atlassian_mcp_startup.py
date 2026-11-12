@@ -1,10 +1,8 @@
 from __future__ import annotations
 
 import copy
-from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import json
 import os
-from pathlib import Path
 import runpy
 import shutil
 import socket
@@ -14,8 +12,9 @@ import threading
 import time
 import tomllib
 import unittest
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from pathlib import Path
 from unittest import mock
-
 
 ROOT = Path(__file__).resolve().parents[1]
 IMAGE = ROOT / "sandboxes/exoshell-base"
@@ -27,46 +26,87 @@ KEY = STARTUP["ATLASSIAN_KEY"]
 
 class AtlassianStartupTests(unittest.TestCase):
     def test_codex_state_wins_after_existing_overrides_before_delimiter(self) -> None:
-        command = ["/usr/bin/codex", "exec", "--config",
-                   "mcp_servers.atlassian.enabled=true", "--", "prompt with spaces", "$(syntax)"]
-        for credential, expected in ((None, "false"), ("", "false"), ("opaque", "true")):
+        command = [
+            "/usr/bin/codex",
+            "exec",
+            "--config",
+            "mcp_servers.atlassian.enabled=true",
+            "--",
+            "prompt with spaces",
+            "$(syntax)",
+        ]
+        for credential, expected in (
+            (None, "false"),
+            ("", "false"),
+            ("opaque", "true"),
+        ):
             with self.subTest(credential=credential):
                 environment = {} if credential is None else {KEY: credential}
                 original = command.copy()
                 result = INITIALIZE(command, environment, Path("/workspace/project"))
-                self.assertEqual(result, command[:4] +
-                                 ["--config", f"mcp_servers.atlassian.enabled={expected}"] + command[4:])
+                self.assertEqual(
+                    result,
+                    command[:4]
+                    + ["--config", f"mcp_servers.atlassian.enabled={expected}"]
+                    + command[4:],
+                )
                 self.assertEqual(command, original)
                 self.assertNotIn("opaque", result)
-        self.assertEqual(INITIALIZE(["codex"], {}, Path("/workspace")),
-                         ["codex", "--config", "mcp_servers.atlassian.enabled=false"])
+        self.assertEqual(
+            INITIALIZE(["codex"], {}, Path("/workspace")),
+            ["codex", "--config", "mcp_servers.atlassian.enabled=false"],
+        )
 
-    def test_opencode_merges_only_atlassian_state_without_disclosing_credential(self) -> None:
+    def test_opencode_merges_only_atlassian_state_without_disclosing_credential(
+        self,
+    ) -> None:
         original = {
             "model": "example/model",
-            "mcp": {"servers": {"other": {"type": "remote", "url": "https://example.com/mcp"},
-                                "atlassian": {"type": "remote", "url": "https://example.com/atlassian",
-                                              "timeout": 12345}}},
+            "mcp": {
+                "servers": {
+                    "other": {"type": "remote", "url": "https://example.com/mcp"},
+                    "atlassian": {
+                        "type": "remote",
+                        "url": "https://example.com/atlassian",
+                        "timeout": 12345,
+                    },
+                }
+            },
         }
         command = ["/usr/local/bin/opencode", "run", "prompt with spaces"]
         for credential, disabled in ((None, True), ("", True), ("opaque", False)):
             with self.subTest(credential=credential):
-                environment = {"OPENCODE_CONFIG_CONTENT": json.dumps(original),
-                               "OPENCODE_CONFIG": "/etc/example.json"}
+                environment = {
+                    "OPENCODE_CONFIG_CONTENT": json.dumps(original),
+                    "OPENCODE_CONFIG": "/etc/example.json",
+                }
                 if credential is not None:
                     environment[KEY] = credential
-                self.assertEqual(INITIALIZE(command, environment, Path("/workspace")), command)
+                self.assertEqual(
+                    INITIALIZE(command, environment, Path("/workspace")), command
+                )
                 wanted = copy.deepcopy(original)
                 wanted["mcp"]["servers"]["atlassian"] = {
-                    "type": "remote", "url": "https://example.com/atlassian",
-                    "timeout": 12345, "disabled": disabled}
-                self.assertEqual(json.loads(environment["OPENCODE_CONFIG_CONTENT"]), wanted)
+                    "type": "remote",
+                    "url": "https://example.com/atlassian",
+                    "timeout": 12345,
+                    "disabled": disabled,
+                }
+                self.assertEqual(
+                    json.loads(environment["OPENCODE_CONFIG_CONTENT"]), wanted
+                )
                 self.assertEqual(environment["OPENCODE_CONFIG"], "/etc/example.json")
                 self.assertNotIn("opaque", environment["OPENCODE_CONFIG_CONTENT"])
 
-    def test_opencode_installs_full_server_when_inline_has_no_typed_definition(self) -> None:
-        full = {"type": "remote", "url": "https://mcp.atlassian.com/v2/mcp", "oauth": False,
-                "headers": {"Authorization": "Bearer {env:ATLASSIAN_MCP_BEARER_TOKEN}"}}
+    def test_opencode_installs_full_server_when_inline_has_no_typed_definition(
+        self,
+    ) -> None:
+        full = {
+            "type": "remote",
+            "url": "https://mcp.atlassian.com/v2/mcp",
+            "oauth": False,
+            "headers": {"Authorization": "Bearer {env:ATLASSIAN_MCP_BEARER_TOKEN}"},
+        }
         for content, credential, disabled in (
             ({}, "opaque", False),
             ({"mcp": {"servers": {"atlassian": {"disabled": True}}}}, None, True),
@@ -77,8 +117,10 @@ class AtlassianStartupTests(unittest.TestCase):
                 if credential is not None:
                     environment[KEY] = credential
                 INITIALIZE(["opencode"], environment, Path("/workspace"))
-                self.assertEqual(json.loads(environment["OPENCODE_CONFIG_CONTENT"]),
-                                 {"mcp": {"servers": {"atlassian": {**full, "disabled": disabled}}}})
+                self.assertEqual(
+                    json.loads(environment["OPENCODE_CONFIG_CONTENT"]),
+                    {"mcp": {"servers": {"atlassian": {**full, "disabled": disabled}}}},
+                )
 
     def test_opencode_empty_config_and_repeated_transitions(self) -> None:
         environment = {}
@@ -87,14 +129,23 @@ class AtlassianStartupTests(unittest.TestCase):
             if credential is not None:
                 environment[KEY] = credential
             INITIALIZE(["opencode"], environment, Path("/workspace"))
-            server = json.loads(environment["OPENCODE_CONFIG_CONTENT"])["mcp"]["servers"]["atlassian"]
+            server = json.loads(environment["OPENCODE_CONFIG_CONTENT"])["mcp"][
+                "servers"
+            ]["atlassian"]
             self.assertEqual(server["disabled"], disabled)
             self.assertEqual(server["type"], "remote")
             self.assertEqual(server["url"], "https://mcp.atlassian.com/v2/mcp")
 
-    def test_opencode_invalid_config_fails_without_overwriting_or_disclosure(self) -> None:
-        for value in ('{"sensitive-value":', '[]', '{"mcp":null}', '{"mcp":{"servers":[]}}',
-                      '{"mcp":{"servers":{"atlassian":[]}}}'):
+    def test_opencode_invalid_config_fails_without_overwriting_or_disclosure(
+        self,
+    ) -> None:
+        for value in (
+            '{"sensitive-value":',
+            "[]",
+            '{"mcp":null}',
+            '{"mcp":{"servers":[]}}',
+            '{"mcp":{"servers":{"atlassian":[]}}}',
+        ):
             with self.subTest(value=value), mock.patch("sys.stderr") as stderr:
                 environment = {"OPENCODE_CONFIG_CONTENT": value}
                 with self.assertRaises(SystemExit) as error:
@@ -111,12 +162,16 @@ class AtlassianStartupTests(unittest.TestCase):
         self.assertEqual(environment, original)
 
     def test_claude_dispatch_uses_credential_presence(self) -> None:
-        with mock.patch.dict(INITIALIZE.__globals__, initialize_claude_mcp=mock.Mock()) as namespace:
+        with mock.patch.dict(
+            INITIALIZE.__globals__, initialize_claude_mcp=mock.Mock()
+        ) as namespace:
             initialize = namespace["initialize_claude_mcp"]
             for credential, expected in ((None, False), ("", False), ("opaque", True)):
                 environment = {} if credential is None else {KEY: credential}
                 command = ["/usr/local/bin/claude", "--print", "prompt"]
-                self.assertEqual(INITIALIZE(command, environment, Path("/workspace")), command)
+                self.assertEqual(
+                    INITIALIZE(command, environment, Path("/workspace")), command
+                )
                 initialize.assert_called_with(environment, Path("/workspace"), expected)
 
     def test_image_defaults_and_template_have_no_active_claude_server(self) -> None:
@@ -133,24 +188,34 @@ class AtlassianStartupTests(unittest.TestCase):
         definition = {key: server[key] for key in server if key != "disabled"}
         self.assertEqual(definition, STARTUP["OPENCODE_ATLASSIAN_SERVER"])
         cli = json.loads((IMAGE / "cli.json").read_text())
-        self.assertEqual(cli["keybinds"], {"terminal.suspend": "none", "prompt.stash": "ctrl+s",
-                                           "prompt.stash.list": "alt+s"})
+        self.assertEqual(
+            cli["keybinds"],
+            {
+                "terminal.suspend": "none",
+                "prompt.stash": "ctrl+s",
+                "prompt.stash.list": "alt+s",
+            },
+        )
         self.assertFalse((IMAGE / "tui.json").exists())
         dockerfile = (IMAGE / "Dockerfile").read_text()
         self.assertIn("ENV CLAUDE_CONFIG_DIR=/sandbox/.claude", dockerfile)
-        self.assertIn("claude.config.json /etc/exoshell/claude-atlassian.json", dockerfile)
+        self.assertIn(
+            "claude.config.json /etc/exoshell/claude-atlassian.json", dockerfile
+        )
         self.assertNotIn("claude.config.json /sandbox/.claude.json", dockerfile)
 
-    @unittest.skipUnless(os.access("/workspace", os.W_OK), "writable /workspace is required")
+    @unittest.skipUnless(
+        os.access("/workspace", os.W_OK), "writable /workspace is required"
+    )
     def test_helper_executes_with_prepared_argv_environment_and_project(self) -> None:
         with tempfile.TemporaryDirectory(dir="/workspace") as temporary:
             directory = Path(temporary)
             executable = directory / "opencode"
             executable.write_text(
-                '#!/usr/bin/env python3\nimport json,os,sys\n'
-                'print(json.dumps([os.getcwd(),sys.argv[1:],'
+                "#!/usr/bin/env python3\nimport json,os,sys\n"
+                "print(json.dumps([os.getcwd(),sys.argv[1:],"
                 'json.loads(os.environ["OPENCODE_CONFIG_CONTENT"])]))\n'
-                'sys.exit(17)\n'
+                "sys.exit(17)\n"
             )
             executable.chmod(0o755)
             environment = os.environ.copy()
@@ -159,14 +224,38 @@ class AtlassianStartupTests(unittest.TestCase):
             for key in ("GWS_CLIENT_ID", "GWS_CLIENT_SECRET", "GWS_REFRESH_TOKEN"):
                 environment.pop(key, None)
             environment.pop("OPENCODE_CONFIG_CONTENT", None)
-            result = subprocess.run([str(IMAGE / "exoshell-agent"), temporary, "--", str(executable),
-                                     "prompt with spaces", "$(syntax)"], env=environment,
-                                    capture_output=True, text=True)
+            result = subprocess.run(
+                [
+                    str(IMAGE / "exoshell-agent"),
+                    temporary,
+                    "--",
+                    str(executable),
+                    "prompt with spaces",
+                    "$(syntax)",
+                ],
+                check=False,
+                env=environment,
+                capture_output=True,
+                text=True,
+            )
             self.assertEqual(result.returncode, 17, result.stderr)
-            self.assertEqual(json.loads(result.stdout),
-                             [temporary, ["prompt with spaces", "$(syntax)"],
-                              {"mcp": {"servers": {"atlassian": {
-                                  **STARTUP["OPENCODE_ATLASSIAN_SERVER"], "disabled": True}}}}])
+            self.assertEqual(
+                json.loads(result.stdout),
+                [
+                    temporary,
+                    ["prompt with spaces", "$(syntax)"],
+                    {
+                        "mcp": {
+                            "servers": {
+                                "atlassian": {
+                                    **STARTUP["OPENCODE_ATLASSIAN_SERVER"],
+                                    "disabled": True,
+                                }
+                            }
+                        }
+                    },
+                ],
+            )
 
 
 class ClaudeMcpStateTests(unittest.TestCase):
@@ -177,9 +266,14 @@ class ClaudeMcpStateTests(unittest.TestCase):
             "theme": "dark",
             "mcpServers": {"other": other_server, "atlassian": {"url": "old"}},
             "projects": {
-                str(project): {"hasTrustDialogAccepted": True,
-                               "mcpServers": {"local": other_server, "atlassian": {"url": "old-local"}},
-                               "disabledMcpServers": ["other", "atlassian", "atlassian"]},
+                str(project): {
+                    "hasTrustDialogAccepted": True,
+                    "mcpServers": {
+                        "local": other_server,
+                        "atlassian": {"url": "old-local"},
+                    },
+                    "disabledMcpServers": ["other", "atlassian", "atlassian"],
+                },
                 "/workspace/other": {"disabledMcpServers": ["atlassian"]},
             },
         }
@@ -188,7 +282,9 @@ class ClaudeMcpStateTests(unittest.TestCase):
             target = directory / ".claude.json"
             target.write_text(json.dumps(original))
             environment = {"CLAUDE_CONFIG_DIR": temporary, KEY: "opaque"}
-            definition = json.loads((IMAGE / "claude.config.json").read_text())["mcpServers"]["atlassian"]
+            definition = json.loads((IMAGE / "claude.config.json").read_text())[
+                "mcpServers"
+            ]["atlassian"]
             for enabled in (True, False, True, False):
                 CLAUDE(environment, project, enabled, IMAGE / "claude.config.json")
                 config = json.loads(target.read_text())
@@ -197,7 +293,10 @@ class ClaudeMcpStateTests(unittest.TestCase):
                 self.assertEqual(config["mcpServers"]["other"], other_server)
                 self.assertEqual(state["mcpServers"]["local"], other_server)
                 self.assertTrue(state["hasTrustDialogAccepted"])
-                self.assertEqual(config["projects"]["/workspace/other"], original["projects"]["/workspace/other"])
+                self.assertEqual(
+                    config["projects"]["/workspace/other"],
+                    original["projects"]["/workspace/other"],
+                )
                 if enabled:
                     self.assertEqual(config["mcpServers"]["atlassian"], definition)
                     self.assertEqual(state["mcpServers"]["atlassian"], definition)
@@ -205,12 +304,16 @@ class ClaudeMcpStateTests(unittest.TestCase):
                 else:
                     self.assertNotIn("atlassian", config["mcpServers"])
                     self.assertNotIn("atlassian", state["mcpServers"])
-                    self.assertEqual(state["disabledMcpServers"], ["other", "atlassian"])
+                    self.assertEqual(
+                        state["disabledMcpServers"], ["other", "atlassian"]
+                    )
                 self.assertEqual(target.stat().st_mode & 0o777, 0o600)
                 self.assertNotIn("opaque", target.read_text())
                 self.assertEqual(list(directory.iterdir()), [target])
 
-    def test_missing_config_uses_home_agent_directory_and_does_not_need_template_when_disabled(self) -> None:
+    def test_missing_config_uses_home_agent_directory_and_does_not_need_template_when_disabled(
+        self,
+    ) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             environment = {"HOME": temporary}
             CLAUDE(environment, Path("/workspace"), False, Path("/missing-template"))
@@ -218,11 +321,20 @@ class ClaudeMcpStateTests(unittest.TestCase):
             self.assertEqual(environment["CLAUDE_CONFIG_DIR"], str(target.parent))
             config = json.loads(target.read_text())
             self.assertEqual(config["mcpServers"], {})
-            self.assertEqual(config["projects"]["/workspace"]["disabledMcpServers"], ["atlassian"])
+            self.assertEqual(
+                config["projects"]["/workspace"]["disabledMcpServers"], ["atlassian"]
+            )
 
-    def test_invalid_state_is_preserved_and_error_does_not_disclose_values(self) -> None:
-        for value in ('{"sensitive-value":', '[]', '{"mcpServers":null}',
-                      '{"projects":[]}', '{"projects":{"/workspace":{"disabledMcpServers":{}}}}'):
+    def test_invalid_state_is_preserved_and_error_does_not_disclose_values(
+        self,
+    ) -> None:
+        for value in (
+            '{"sensitive-value":',
+            "[]",
+            '{"mcpServers":null}',
+            '{"projects":[]}',
+            '{"projects":{"/workspace":{"disabledMcpServers":{}}}}',
+        ):
             with self.subTest(value=value), tempfile.TemporaryDirectory() as temporary:
                 target = Path(temporary) / ".claude.json"
                 target.write_text(value)
@@ -236,8 +348,11 @@ class ClaudeMcpStateTests(unittest.TestCase):
             directory = Path(temporary)
             target = directory / ".claude.json"
             target.write_text('{"theme":"dark"}')
-            with mock.patch("os.replace", side_effect=OSError("sensitive-value")), \
-                 mock.patch("sys.stderr") as stderr, self.assertRaises(SystemExit):
+            with (
+                mock.patch("os.replace", side_effect=OSError("sensitive-value")),
+                mock.patch("sys.stderr") as stderr,
+                self.assertRaises(SystemExit),
+            ):
                 CLAUDE({"CLAUDE_CONFIG_DIR": temporary}, Path("/workspace"), False)
             self.assertEqual(target.read_text(), '{"theme":"dark"}')
             self.assertEqual(list(directory.iterdir()), [target])
@@ -253,20 +368,50 @@ class InstalledClientTests(unittest.TestCase):
                 environment.pop(KEY, None)
                 if enabled:
                     environment[KEY] = "test-placeholder"
-                command = INITIALIZE(["codex", "mcp", "list", "--json", "-c",
-                                      f"mcp_servers.atlassian.enabled={str(not enabled).lower()}",
-                                      "-c", 'mcp_servers.atlassian.url="https://example.com/mcp"'],
-                                     environment, Path(temporary))
-                result = subprocess.run(command, env=environment, cwd=temporary,
-                                        capture_output=True, text=True, timeout=20)
-                self.assertEqual(result.returncode, 0, "Codex could not load runtime configuration")
-                server = next(server for server in json.loads(result.stdout) if server["name"] == "atlassian")
+                command = INITIALIZE(
+                    [
+                        "codex",
+                        "mcp",
+                        "list",
+                        "--json",
+                        "-c",
+                        f"mcp_servers.atlassian.enabled={str(not enabled).lower()}",
+                        "-c",
+                        'mcp_servers.atlassian.url="https://example.com/mcp"',
+                    ],
+                    environment,
+                    Path(temporary),
+                )
+                result = subprocess.run(
+                    command,
+                    check=False,
+                    env=environment,
+                    cwd=temporary,
+                    capture_output=True,
+                    text=True,
+                    timeout=20,
+                )
+                self.assertEqual(
+                    result.returncode, 0, "Codex could not load runtime configuration"
+                )
+                server = next(
+                    server
+                    for server in json.loads(result.stdout)
+                    if server["name"] == "atlassian"
+                )
                 self.assertEqual(server["enabled"], enabled)
 
     @unittest.skipUnless(shutil.which("opencode"), "OpenCode is not installed")
-    def test_opencode_runtime_override_wins_over_image_and_inline_settings(self) -> None:
-        version = subprocess.run(["opencode", "--version"], capture_output=True,
-                                 text=True, timeout=30)
+    def test_opencode_runtime_override_wins_over_image_and_inline_settings(
+        self,
+    ) -> None:
+        version = subprocess.run(
+            ["opencode", "--version"],
+            check=False,
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
         if "opencode v2" not in version.stdout:
             self.skipTest("OpenCode v2 is not installed")
 
@@ -274,12 +419,23 @@ class InstalledClientTests(unittest.TestCase):
             # The v2 CLI serves requests from a per-user background server, so
             # each iteration restarts it to load the current environment. The
             # stop command returns before the port is released, so wait for it.
-            subprocess.run(["opencode", "service", "stop"], env=environment,
-                           capture_output=True, timeout=30)
+            subprocess.run(
+                ["opencode", "service", "stop"],
+                check=False,
+                env=environment,
+                capture_output=True,
+                timeout=30,
+            )
             deadline = time.monotonic() + 60
             while True:
-                probe = subprocess.run(["opencode", "service", "status"], env=environment,
-                                       capture_output=True, text=True, timeout=30)
+                probe = subprocess.run(
+                    ["opencode", "service", "status"],
+                    check=False,
+                    env=environment,
+                    capture_output=True,
+                    text=True,
+                    timeout=30,
+                )
                 if probe.stdout.strip() == "stopped":
                     return
                 if time.monotonic() > deadline:
@@ -288,38 +444,86 @@ class InstalledClientTests(unittest.TestCase):
 
         with tempfile.TemporaryDirectory() as temporary:
             directory = Path(temporary)
-            environment = {**os.environ, "OPENCODE_CONFIG": str(IMAGE / "opencode.json")}
-            for key in ("XDG_CONFIG_HOME", "XDG_DATA_HOME", "XDG_CACHE_HOME", "XDG_STATE_HOME"):
+            environment = {
+                **os.environ,
+                "OPENCODE_CONFIG": str(IMAGE / "opencode.json"),
+            }
+            for key in (
+                "XDG_CONFIG_HOME",
+                "XDG_DATA_HOME",
+                "XDG_CACHE_HOME",
+                "XDG_STATE_HOME",
+            ):
                 environment[key] = str(directory / key)
             # XDG directories isolate service state, but not the default port.
             # Leave any existing user service alone and use a free test port.
             with socket.socket() as listener:
                 listener.bind(("127.0.0.1", 0))
                 port = listener.getsockname()[1]
-            configured = subprocess.run(["opencode", "service", "set", "port", str(port)],
-                                        env=environment, capture_output=True, timeout=30)
-            self.assertEqual(configured.returncode, 0, "OpenCode could not configure test service port")
+            configured = subprocess.run(
+                ["opencode", "service", "set", "port", str(port)],
+                check=False,
+                env=environment,
+                capture_output=True,
+                timeout=30,
+            )
+            self.assertEqual(
+                configured.returncode,
+                0,
+                "OpenCode could not configure test service port",
+            )
             for enabled in (False, True):
                 environment.pop(KEY, None)
                 if enabled:
                     environment[KEY] = "test-placeholder"
-                environment["OPENCODE_CONFIG_CONTENT"] = json.dumps({
-                    "update": "disable", "mcp": {"servers": {"atlassian": {
-                        **STARTUP["OPENCODE_ATLASSIAN_SERVER"], "disabled": not enabled}}},
-                })
+                environment["OPENCODE_CONFIG_CONTENT"] = json.dumps(
+                    {
+                        "update": "disable",
+                        "mcp": {
+                            "servers": {
+                                "atlassian": {
+                                    **STARTUP["OPENCODE_ATLASSIAN_SERVER"],
+                                    "disabled": not enabled,
+                                }
+                            }
+                        },
+                    }
+                )
                 stop_service(environment)
                 try:
-                    command = INITIALIZE(["opencode", "debug", "config"], environment, directory)
-                    result = subprocess.run(command, env=environment, cwd=directory,
-                                            capture_output=True, text=True, timeout=60)
+                    command = INITIALIZE(
+                        ["opencode", "debug", "config"], environment, directory
+                    )
+                    result = subprocess.run(
+                        command,
+                        check=False,
+                        env=environment,
+                        cwd=directory,
+                        capture_output=True,
+                        text=True,
+                        timeout=60,
+                    )
                 finally:
                     stop_service(environment)
-                self.assertEqual(result.returncode, 0, "OpenCode could not load runtime configuration")
-                documents = [document.get("info", {}) for document in json.loads(result.stdout)
-                             if document.get("type") == "document" and "path" not in document]
-                inline = [info for info in documents
-                          if info.get("mcp", {}).get("servers", {}).get("atlassian", {}).get("url")
-                          == "https://mcp.atlassian.com/v2/mcp"]
+                self.assertEqual(
+                    result.returncode,
+                    0,
+                    "OpenCode could not load runtime configuration",
+                )
+                documents = [
+                    document.get("info", {})
+                    for document in json.loads(result.stdout)
+                    if document.get("type") == "document" and "path" not in document
+                ]
+                inline = [
+                    info
+                    for info in documents
+                    if info.get("mcp", {})
+                    .get("servers", {})
+                    .get("atlassian", {})
+                    .get("url")
+                    == "https://mcp.atlassian.com/v2/mcp"
+                ]
                 self.assertTrue(inline, "inline OpenCode configuration is missing")
                 for info in inline:
                     server = info["mcp"]["servers"]["atlassian"]
@@ -328,7 +532,9 @@ class InstalledClientTests(unittest.TestCase):
                 self.assertIn("disable", [info.get("update") for info in inline])
 
     @unittest.skipUnless(shutil.which("claude"), "Claude Code is not installed")
-    def test_claude_connects_when_enabled_and_blocks_project_entry_when_disabled(self) -> None:
+    def test_claude_connects_when_enabled_and_blocks_project_entry_when_disabled(
+        self,
+    ) -> None:
         requests = []
 
         class McpHandler(BaseHTTPRequestHandler):
@@ -336,7 +542,9 @@ class InstalledClientTests(unittest.TestCase):
                 pass
 
             def do_POST(self):
-                request = json.loads(self.rfile.read(int(self.headers["Content-Length"])))
+                request = json.loads(
+                    self.rfile.read(int(self.headers["Content-Length"]))
+                )
                 requests.append(request["method"])
                 if "id" not in request:
                     self.send_response(202)
@@ -344,8 +552,11 @@ class InstalledClientTests(unittest.TestCase):
                     return
                 result = {}
                 if request["method"] == "initialize":
-                    result = {"protocolVersion": request["params"]["protocolVersion"],
-                              "capabilities": {}, "serverInfo": {"name": "test", "version": "1"}}
+                    result = {
+                        "protocolVersion": request["params"]["protocolVersion"],
+                        "capabilities": {},
+                        "serverInfo": {"name": "test", "version": "1"},
+                    }
                 response = {"jsonrpc": "2.0", "id": request["id"], "result": result}
                 data = json.dumps(response).encode()
                 self.send_response(200)
@@ -360,18 +571,37 @@ class InstalledClientTests(unittest.TestCase):
         try:
             with tempfile.TemporaryDirectory() as temporary:
                 directory = Path(temporary)
-                environment = {**os.environ, "CLAUDE_CONFIG_DIR": str(directory / "claude"),
-                               KEY: "test-placeholder"}
-                definition = {"mcpServers": {"atlassian": {
-                    "type": "http", "url": f"http://127.0.0.1:{server.server_port}/mcp",
-                    "headers": {"Authorization": "Bearer ${ATLASSIAN_MCP_BEARER_TOKEN}"},
-                }}}
+                environment = {
+                    **os.environ,
+                    "CLAUDE_CONFIG_DIR": str(directory / "claude"),
+                    KEY: "test-placeholder",
+                }
+                definition = {
+                    "mcpServers": {
+                        "atlassian": {
+                            "type": "http",
+                            "url": f"http://127.0.0.1:{server.server_port}/mcp",
+                            "headers": {
+                                "Authorization": "Bearer ${ATLASSIAN_MCP_BEARER_TOKEN}"
+                            },
+                        }
+                    }
+                }
                 template = directory / "template.json"
                 template.write_text(json.dumps(definition))
                 CLAUDE(environment, directory, True, template)
-                result = subprocess.run(["claude", "mcp", "get", "atlassian"], env=environment,
-                                        cwd=directory, capture_output=True, text=True, timeout=20)
-                self.assertEqual(result.returncode, 0, "Claude could not load runtime configuration")
+                result = subprocess.run(
+                    ["claude", "mcp", "get", "atlassian"],
+                    check=False,
+                    env=environment,
+                    cwd=directory,
+                    capture_output=True,
+                    text=True,
+                    timeout=20,
+                )
+                self.assertEqual(
+                    result.returncode, 0, "Claude could not load runtime configuration"
+                )
                 self.assertIn("Connected", result.stdout)
                 self.assertIn("initialize", requests)
                 requests.clear()
@@ -379,18 +609,36 @@ class InstalledClientTests(unittest.TestCase):
                 # A project entry survives removing the generated user/local
                 # entry, but the per-project disabled list must stop connection.
                 (directory / ".mcp.json").write_text(json.dumps(definition))
-                (directory / "claude/settings.json").write_text('{"enableAllProjectMcpServers":true}')
+                (directory / "claude/settings.json").write_text(
+                    '{"enableAllProjectMcpServers":true}'
+                )
                 environment.pop(KEY)
                 CLAUDE(environment, directory, False, template)
-                result = subprocess.run(["claude", "mcp", "get", "atlassian"], env=environment,
-                                        cwd=directory, capture_output=True, text=True, timeout=20)
-                self.assertEqual(result.returncode, 0, "Claude could not load project configuration")
+                result = subprocess.run(
+                    ["claude", "mcp", "get", "atlassian"],
+                    check=False,
+                    env=environment,
+                    cwd=directory,
+                    capture_output=True,
+                    text=True,
+                    timeout=20,
+                )
+                self.assertEqual(
+                    result.returncode, 0, "Claude could not load project configuration"
+                )
                 self.assertIn("Disabled for this project", result.stdout)
                 self.assertEqual(requests, [])
 
                 (directory / ".mcp.json").unlink()
-                result = subprocess.run(["claude", "mcp", "get", "atlassian"], env=environment,
-                                        cwd=directory, capture_output=True, text=True, timeout=20)
+                result = subprocess.run(
+                    ["claude", "mcp", "get", "atlassian"],
+                    check=False,
+                    env=environment,
+                    cwd=directory,
+                    capture_output=True,
+                    text=True,
+                    timeout=20,
+                )
                 self.assertNotEqual(result.returncode, 0)
                 self.assertIn('No MCP server named "atlassian"', result.stderr)
                 self.assertEqual(requests, [])

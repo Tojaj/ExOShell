@@ -368,11 +368,8 @@ shown in [`providers.md`](providers.md). Rebuild after image or policy changes;
 profile changes require re-import/update and provider creation once per machine.
 
 The launcher requires Python 3.11 or newer. The policy overlay helper also
-requires PyYAML. Run automated checks with:
-
-```bash
-python3 -m unittest discover -s tests -v
-```
+requires PyYAML. See [CONTRIBUTING.md](CONTRIBUTING.md) for development setup
+and automated checks.
 
 ## Manual acceptance checks
 

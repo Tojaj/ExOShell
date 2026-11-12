@@ -59,7 +59,9 @@ class StrictLoader(yaml.SafeLoader):
     """Safe YAML loader that rejects duplicate mapping keys at every depth."""
 
 
-def construct_mapping(loader: StrictLoader, node: yaml.nodes.MappingNode, deep: bool = False) -> dict:
+def construct_mapping(
+    loader: StrictLoader, node: yaml.nodes.MappingNode, deep: bool = False
+) -> dict:
     loader.flatten_mapping(node)
     mapping = {}
     for key_node, value_node in node.value:
@@ -84,6 +86,7 @@ StrictLoader.add_constructor(
 # YAML loading and structural validation
 # ---------------------------------------------------------------------------
 
+
 def load_yaml(path: Path) -> Any:
     """Load YAML safely, reporting duplicate and syntax errors with their file."""
     try:
@@ -94,7 +97,9 @@ def load_yaml(path: Path) -> Any:
     except DuplicateKeyError as error:
         raise PolicyError(f"{path}: {error}") from error
     except yaml.YAMLError as error:
-        raise PolicyError(f"cannot parse YAML {path}: {error.problem or error}") from error
+        raise PolicyError(
+            f"cannot parse YAML {path}: {error.problem or error}"
+        ) from error
 
 
 def validate_network_policies(
@@ -105,7 +110,9 @@ def validate_network_policies(
         raise PolicyError(f"{source}: document root must be a mapping")
 
     if overlay and set(document) != {"network_policies"}:
-        raise PolicyError(f"{source}: document root must contain exactly 'network_policies'")
+        raise PolicyError(
+            f"{source}: document root must contain exactly 'network_policies'"
+        )
     if "network_policies" not in document:
         raise PolicyError(f"{source}: missing 'network_policies'")
 
@@ -145,6 +152,7 @@ def load_base_network_policies(path: Path) -> dict[str, dict[str, Any]]:
 # Overlay resolution and composition
 # ---------------------------------------------------------------------------
 
+
 def resolve_overlay(name: str) -> Path:
     """Resolve a bare overlay name or an explicit path to an absolute Path."""
     path = Path(name)
@@ -166,7 +174,8 @@ def resolve_overlays(names: list[str]) -> list[Path]:
 
 
 def compose_network_policies(
-    base: dict[str, dict[str, Any]], overlays: list[tuple[Path, dict[str, dict[str, Any]]]]
+    base: dict[str, dict[str, Any]],
+    overlays: list[tuple[Path, dict[str, dict[str, Any]]]],
 ) -> dict[str, dict[str, Any]]:
     """Replace colliding entries wholesale while composing distinct policy keys."""
     seen_keys: dict[str, Path] = {}
@@ -186,6 +195,7 @@ def compose_network_policies(
 # ---------------------------------------------------------------------------
 # Local invariants
 # ---------------------------------------------------------------------------
+
 
 def effective_ports(endpoint: dict[str, Any], field: str) -> list[int]:
     """Mirror OpenShell's port precedence for the GraphQL selector identity."""
@@ -209,7 +219,9 @@ def validate_invariants(network_policies: dict[str, dict[str, Any]]) -> None:
         for index, endpoint in enumerate(entry.get("endpoints", [])):
             field = f"network_policies.{key}.endpoints[{index}]"
             if "access" in endpoint and "rules" in endpoint:
-                raise PolicyError(f"{field}: 'access' and 'rules' are mutually exclusive")
+                raise PolicyError(
+                    f"{field}: 'access' and 'rules' are mutually exclusive"
+                )
             if endpoint.get("protocol") != "graphql":
                 continue
 
@@ -234,6 +246,7 @@ def validate_invariants(network_policies: dict[str, dict[str, Any]]) -> None:
 # Diff and OpenShell execution
 # ---------------------------------------------------------------------------
 
+
 def summarise_diff(before: dict[str, Any], after: dict[str, Any]) -> list[str]:
     """Return a short list of changed network_policies keys."""
     lines = []
@@ -251,6 +264,7 @@ def get_live_policy(sandbox: str) -> dict[str, Any]:
     """Fetch the live policy so static sections remain untouched."""
     result = subprocess.run(
         ["openshell", "policy", "get", sandbox, "--base", "-o", "json"],
+        check=False,
         capture_output=True,
         text=True,
     )
@@ -271,6 +285,7 @@ def revert_base_file(sandbox: str, explicit: str | None) -> Path:
         return Path(explicit).expanduser()
     result = subprocess.run(
         ["openshell", "sandbox", "get", sandbox, "-o", "json"],
+        check=False,
         capture_output=True,
         text=True,
     )
@@ -290,7 +305,9 @@ def revert_base_file(sandbox: str, explicit: str | None) -> Path:
         raise PolicyError("invalid policy-source annotation; supply --base-file PATH")
     path = Path(source)
     if not path.is_absolute():
-        raise PolicyError("policy-source annotation must be absolute; supply --base-file PATH")
+        raise PolicyError(
+            "policy-source annotation must be absolute; supply --base-file PATH"
+        )
     try:
         available = path.is_file()
     except OSError as error:
@@ -298,20 +315,27 @@ def revert_base_file(sandbox: str, explicit: str | None) -> Path:
             f"cannot access recorded policy source {path}: {error}; supply --base-file PATH"
         ) from error
     if not available:
-        raise PolicyError(f"recorded policy source is unavailable: {path}; supply --base-file PATH")
+        raise PolicyError(
+            f"recorded policy source is unavailable: {path}; supply --base-file PATH"
+        )
     return path
 
 
-def apply_policy(policy: dict[str, Any], sandbox: str, *, wait: bool, timeout: int) -> None:
+def apply_policy(
+    policy: dict[str, Any], sandbox: str, *, wait: bool, timeout: int
+) -> None:
     """Write the policy temporarily and hand it to the OpenShell CLI."""
-    temporary = tempfile.NamedTemporaryFile(suffix=".yaml", mode="w", delete=False, encoding="utf-8")
+    # Close before the external CLI reads it; unlink separately in finally.
+    temporary = tempfile.NamedTemporaryFile(  # noqa: SIM115
+        suffix=".yaml", mode="w", delete=False, encoding="utf-8"
+    )
     try:
         yaml.safe_dump(policy, temporary, sort_keys=False)
         temporary.close()
         command = ["openshell", "policy", "set", sandbox, "--policy", temporary.name]
         if wait:
             command += ["--wait", "--timeout", str(timeout)]
-        result = subprocess.run(command)
+        result = subprocess.run(command, check=False)
         if result.returncode != 0:
             raise SystemExit(result.returncode)
     finally:
@@ -344,17 +368,27 @@ def parser() -> argparse.ArgumentParser:
 def main() -> None:
     try:
         args = parser().parse_args()
-        print(f"Fetching live base policy for sandbox '{args.sandbox}' ...", file=sys.stderr)
+        print(
+            f"Fetching live base policy for sandbox '{args.sandbox}' ...",
+            file=sys.stderr,
+        )
         live_policy = get_live_policy(args.sandbox)
-        live_network = validate_network_policies(live_policy, "live policy", overlay=False)
+        live_network = validate_network_policies(
+            live_policy, "live policy", overlay=False
+        )
 
         if args.revert:
             base_file = revert_base_file(args.sandbox, args.base_file)
             try:
                 composed_base = load_base_network_policies(base_file)
             except PolicyError as error:
-                raise PolicyError(f"{error}; supply --base-file PATH to select another baseline") from error
-            print(f"--revert: starting from network_policies in '{base_file}'", file=sys.stderr)
+                raise PolicyError(
+                    f"{error}; supply --base-file PATH to select another baseline"
+                ) from error
+            print(
+                f"--revert: starting from network_policies in '{base_file}'",
+                file=sys.stderr,
+            )
         else:
             composed_base = live_network
 
@@ -364,7 +398,9 @@ def main() -> None:
         validate_invariants(composed_network)
 
         for path, policies in overlays:
-            print(f"Applied overlay: {path.name} ({', '.join(policies)})", file=sys.stderr)
+            print(
+                f"Applied overlay: {path.name} ({', '.join(policies)})", file=sys.stderr
+            )
 
         final_policy = dict(live_policy)
         final_policy["network_policies"] = composed_network
@@ -378,7 +414,9 @@ def main() -> None:
             print("(dry run - not applied)", file=sys.stderr)
             return
 
-        apply_policy(final_policy, args.sandbox, wait=not args.no_wait, timeout=args.timeout)
+        apply_policy(
+            final_policy, args.sandbox, wait=not args.no_wait, timeout=args.timeout
+        )
         print(f"Policy applied to sandbox '{args.sandbox}'.", file=sys.stderr)
     except PolicyError as error:
         sys.exit(str(error))

@@ -1,0 +1,85 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.ref }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  pre-commit:
+    name: pre-commit
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    steps:
+      - name: Check out source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Set up Python
+        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: '3.11'
+      - name: Install check dependencies
+        run: python -m pip install --no-cache-dir -r requirements-dev.txt
+      - name: Run pre-commit
+        run: pre-commit run --all-files --show-diff-on-failure
+      - name: Scan checkout for secrets
+        run: pre-commit run gitleaks-checkout --all-files --hook-stage manual
+
+  unit-tests:
+    name: unit-tests
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    steps:
+      - name: Check out source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Set up Python
+        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: '3.11'
+      - name: Install check dependencies
+        run: python -m pip install --no-cache-dir -r requirements-dev.txt
+      - name: Prepare test prerequisites
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes --no-install-recommends jq openssl
+          sudo install -d -o "$(id -u)" -g "$(id -g)" -m 0755 /workspace
+      - name: Run project tests
+        run: python scripts/run-unit-tests.py --allow-missing-clients tests
+      - name: Run version-check skill tests
+        run: python scripts/run-unit-tests.py .agents/skills/bump-exoshell-base-versions/tests
+
+  ci:
+    name: CI
+    if: ${{ always() }}
+    needs: [pre-commit, unit-tests]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions: {}
+    steps:
+      - name: Require both checks to succeed
+        env:
+          PRE_COMMIT_RESULT: ${{ needs.pre-commit.result }}
+          UNIT_TESTS_RESULT: ${{ needs.unit-tests.result }}
+        run: |
+          printf 'pre-commit: %s\nunit-tests: %s\n' "$PRE_COMMIT_RESULT" "$UNIT_TESTS_RESULT"
+          test "$PRE_COMMIT_RESULT" = success
+          test "$UNIT_TESTS_RESULT" = success
