@@ -5,9 +5,14 @@ repos:
     rev: 3e8a8703264a2f4a69428a0aa4dcb512790b2c8c # v6.0.0
     hooks:
       - id: trailing-whitespace
+      - id: mixed-line-ending
+        args: [--fix=lf]
       - id: end-of-file-fixer
       - id: check-merge-conflict
         args: [--assume-in-merge]
+      - id: detect-private-key
+      - id: check-added-large-files
+        args: [--maxkb=500, --enforce-all]
       - id: check-yaml
       - id: check-json
       - id: check-toml
@@ -29,11 +34,11 @@ repos:
     hooks:
       - id: shellcheck
 
-  - repo: https://github.com/Mateusz-Grzelinski/actionlint-py
-    rev: 805f85e558841bf4d852335e036b33d2b26be1cc # v1.7.12.25 (actionlint 1.7.12)
+  - repo: https://github.com/rhysd/actionlint
+    rev: 914e7df21a07ef503a81201c76d2b11c789d3fca # v1.7.12
     hooks:
       - id: actionlint
-        additional_dependencies: [shellcheck-py==0.11.0.1]
+        language_version: '1.27.4'
 
   - repo: https://github.com/zizmorcore/zizmor-pre-commit
     rev: 06a39750ec31860bb44f2acf67182c40016cd1e7 # v1.32.0

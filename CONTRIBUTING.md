@@ -14,6 +14,8 @@ pre-commit run --all-files --show-diff-on-failure
 
 Pre-commit installs its pinned tools into isolated environments. The first run
 needs network access to obtain them. Hooks clean whitespace and final newlines,
+normalize text line endings to LF, detect recognizable private keys, reject
+files larger than 500 KiB (including existing files during CI checks),
 validate YAML/JSON/TOML (including `.exoshell.local.toml.example`), lint and
 format Python with Ruff, check shell scripts with ShellCheck, and check Actions
 with actionlint and offline zizmor in its auditor persona. Findings fail the
@@ -21,6 +23,12 @@ check. Review automatic edits and rerun until every hook passes. Ruff includes
 the extensionless `sandboxes/exoshell-base/exoshell-agent` helper and targets
 Python 3.11 with its default lint rules and the narrowly documented exceptions
 in `ruff.toml`.
+
+Actionlint uses its [official pre-commit hook](https://github.com/rhysd/actionlint/blob/main/docs/usage.md#pre-commit).
+Pre-commit downloads the pinned Go toolchain and builds actionlint in an
+isolated environment; a system Go installation is unnecessary. Keep the
+development virtual environment active so actionlint can find the pinned
+ShellCheck installed by `requirements-dev.txt` to check workflow `run:` blocks.
 
 To run just Python linting and formatting:
 
