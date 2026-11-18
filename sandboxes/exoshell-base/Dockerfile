@@ -168,6 +168,9 @@ ENV GLAB_CONFIG_DIR=/etc/glab-cli \
 
 # Local configuration is intentionally last: changing it must not invalidate
 # cached package installs or downloaded CLI binaries.
+# Codex's SQLite migrations need a writable temp directory. SQLite checks
+# /var/tmp first, but the sandbox policy allows /tmp instead.
+ENV SQLITE_TMPDIR=/tmp
 # System-level Codex defaults are independent of disposable user state.
 COPY --chmod=0644 codex.config.toml /etc/codex/config.toml
 COPY --chmod=0644 agent-instructions/ /etc/exoshell/instructions/
