@@ -26,6 +26,7 @@ nav = [
     { "Atlassian Rovo MCP" = "integrations/atlassian.md" },
     { "Tavily web search" = "integrations/web-search.md" },
     { "Update provider profiles" = "integrations/update-provider-profiles.md" },
+    { "Rotate provider secrets" = "integrations/rotate-provider-secrets.md" },
   ] },
   { "Customize" = [
     { "Overview" = "customize/index.md" },

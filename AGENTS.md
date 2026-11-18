@@ -34,7 +34,7 @@ Load `./AGENTS.local.md` if available for local specific guidance.
 
 ## AI attribution
 
-Include `Assisted-by: AGENT_NAME:MODEL_VERSION` in commit messages and pull
+Include `Assisted-by: AGENT_NAME: MODEL_NAME MODEL_VERSION` in commit messages and pull
 request descriptions, using the actual tool and model version.
 
 ## Contributing

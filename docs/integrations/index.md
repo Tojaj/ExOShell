@@ -52,6 +52,9 @@ read-only. `-publish` is reserved for future publishing profiles.
 
 ## Provider lifecycle
 
+Use the [secret rotation helper](rotate-provider-secrets.md) to replace stored
+credentials on an existing provider instance.
+
 Lint a profile before its first import:
 
 ```bash
