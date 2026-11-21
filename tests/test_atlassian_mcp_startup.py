@@ -187,15 +187,6 @@ class AtlassianStartupTests(unittest.TestCase):
         # typed server, so the two must stay in sync (modulo the switch).
         definition = {key: server[key] for key in server if key != "disabled"}
         self.assertEqual(definition, STARTUP["OPENCODE_ATLASSIAN_SERVER"])
-        cli = json.loads((IMAGE / "cli.json").read_text())
-        self.assertEqual(
-            cli["keybinds"],
-            {
-                "terminal.suspend": "none",
-                "prompt.stash": "ctrl+s",
-                "prompt.stash.list": "alt+s",
-            },
-        )
         self.assertFalse((IMAGE / "tui.json").exists())
         dockerfile = (IMAGE / "Dockerfile").read_text()
         self.assertIn("ENV CLAUDE_CONFIG_DIR=/sandbox/.claude", dockerfile)
@@ -203,6 +194,32 @@ class AtlassianStartupTests(unittest.TestCase):
             "claude.config.json /etc/exoshell/claude-atlassian.json", dockerfile
         )
         self.assertNotIn("claude.config.json /sandbox/.claude.json", dockerfile)
+
+    def test_cli_keybinds_keep_required_baseline_and_valid_shape(self) -> None:
+        cli = json.loads((IMAGE / "cli.json").read_text())
+        keybinds = cli["keybinds"]
+        self.assertIsInstance(keybinds, dict)
+        # Baseline the sandbox relies on; additional UX bindings are allowed
+        # without touching this test.
+        for key, expected in (
+            ("terminal.suspend", "none"),
+            ("prompt.stash", "ctrl+s"),
+            ("prompt.stash.list", "alt+s"),
+        ):
+            self.assertIn(key, keybinds)
+            self.assertEqual(keybinds[key], expected)
+        # Lightweight lint: catch typos such as null/numeric/empty bindings.
+        for key, value in keybinds.items():
+            self.assertIsInstance(key, str)
+            self.assertTrue(key, f"empty keybind name: {key!r}")
+            if isinstance(value, str):
+                self.assertTrue(value, f"empty binding for {key!r}")
+            else:
+                self.assertIsInstance(value, list, f"invalid binding for {key!r}")
+                self.assertTrue(value, f"empty binding list for {key!r}")
+                for entry in value:
+                    self.assertIsInstance(entry, str, f"invalid entry for {key!r}")
+                    self.assertTrue(entry, f"empty entry for {key!r}")
 
     @unittest.skipUnless(
         os.access("/workspace", os.W_OK), "writable /workspace is required"
