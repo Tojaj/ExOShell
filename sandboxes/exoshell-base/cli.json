@@ -3,6 +3,11 @@
   "keybinds": {
     "terminal.suspend": "none",
     "prompt.stash": "ctrl+s",
-    "prompt.stash.list": "alt+s"
+    "prompt.stash.list": "alt+s",
+    "input.submit": ["return", "kpenter"],
+    "session.first": "ctrl+g",
+    "session.last": "ctrl+alt+g",
+    "input.visual.line.home": "home",
+    "input.visual.line.end": "end"
   }
 }
