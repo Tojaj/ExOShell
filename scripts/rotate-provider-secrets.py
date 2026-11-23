@@ -23,7 +23,8 @@ def list_providers() -> list[dict]:
     next_page = command
     seen_tokens = set()
     while True:
-        result = subprocess.run(
+        # The page token is an argument to the OpenShell provider list command.
+        result = subprocess.run(  # noqa: S603
             next_page, check=True, stdout=subprocess.PIPE, text=True
         )
         page = json.loads(result.stdout)
@@ -90,7 +91,8 @@ def rotate(name: str, credentials: list[tuple[str, list[str]]]) -> bool:
     command = ["openshell", "provider", "update", name]
     for key in replacements:
         command.extend(("--credential", key))
-    result = subprocess.run(
+    # Pass the provider and credential names as arguments to OpenShell.
+    result = subprocess.run(  # noqa: S603
         command,
         env={**os.environ, **replacements},
         stdin=subprocess.DEVNULL,

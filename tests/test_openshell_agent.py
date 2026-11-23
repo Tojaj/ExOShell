@@ -719,7 +719,7 @@ class NoShareTests(unittest.TestCase):
                                 "mounts": [
                                     {
                                         "type": "tmpfs",
-                                        "target": "/tmp/gws",
+                                        "target": "/tmp/gws",  # noqa: S108
                                         "mode": 0o777,
                                     }
                                 ]
@@ -888,7 +888,8 @@ class CommandTests(unittest.TestCase):
                 settings = self.settings(Path(temporary), agent)
                 mounts = launcher.mount_config(settings)["podman"]["mounts"]
                 self.assertEqual(
-                    [mount["target"] for mount in mounts], ["/workspace", "/tmp/gws"]
+                    [mount["target"] for mount in mounts],
+                    ["/workspace", "/tmp/gws"],  # noqa: S108
                 )
                 command = launcher.create_command(
                     settings,
@@ -929,7 +930,8 @@ class CommandTests(unittest.TestCase):
             settings = self.settings(Path(temporary), "opencode")
             mounts = launcher.mount_config(settings)["podman"]["mounts"]
             self.assertEqual(
-                mounts[-1], {"type": "tmpfs", "target": "/tmp/gws", "mode": 0o777}
+                mounts[-1],
+                {"type": "tmpfs", "target": "/tmp/gws", "mode": 0o777},  # noqa: S108
             )
             environment = launcher.environment_args(settings, "A User", "a@example.com")
             self.assertNotIn("EXOSHELL_GWS=1", environment)
@@ -971,7 +973,8 @@ class CommandTests(unittest.TestCase):
         for basename, expected in cases.items():
             with self.subTest(basename=basename):
                 self.assertEqual(
-                    launcher.project_label(Path("/tmp") / basename), expected
+                    launcher.project_label(Path("/tmp") / basename),  # noqa: S108
+                    expected,
                 )
 
 
@@ -1075,7 +1078,7 @@ class LauncherIntegrationTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
             environment, capture, _ = self.fake_environment(root)
-            environment["EXOSHELL_TEST_SECRET"] = "secret must not be dumped"
+            environment["EXOSHELL_TEST_SECRET"] = "secret must not be dumped"  # noqa: S105
             config = root / "launcher.toml"
             config.write_text('image = "localhost/test-image:latest"\n')
             commands = []
@@ -1229,7 +1232,7 @@ class LauncherIntegrationTests(unittest.TestCase):
             mount_data = json.loads(driver.split("=", 1)[1])
             self.assertEqual(
                 [mount["target"] for mount in mount_data["podman"]["mounts"][1:]],
-                ["/tmp/gws"],
+                ["/tmp/gws"],  # noqa: S108
             )
 
 
@@ -1289,8 +1292,8 @@ class ImageStartupTests(unittest.TestCase):
     def test_rejects_project_outside_workspace_and_symlink_escape(self) -> None:
         with tempfile.TemporaryDirectory(dir="/workspace") as temporary:
             escape = Path(temporary) / "escape"
-            escape.symlink_to("/tmp", target_is_directory=True)
-            for project in ("relative", "/tmp", str(escape)):
+            escape.symlink_to("/tmp", target_is_directory=True)  # noqa: S108
+            for project in ("relative", "/tmp", str(escape)):  # noqa: S108
                 with self.subTest(project=project):
                     result = subprocess.run(
                         [str(self.HELPER), project, "--", "/bin/true"],
@@ -1310,7 +1313,7 @@ class ImageStartupTests(unittest.TestCase):
             environment = os.environ.copy()
             for key in ("GWS_CLIENT_ID", "GWS_CLIENT_SECRET", "GWS_REFRESH_TOKEN"):
                 environment.pop(key, None)
-            environment["GWS_REFRESH_TOKEN"] = "sensitive-value"
+            environment["GWS_REFRESH_TOKEN"] = "sensitive-value"  # noqa: S105
             result = subprocess.run(
                 [
                     str(self.HELPER),

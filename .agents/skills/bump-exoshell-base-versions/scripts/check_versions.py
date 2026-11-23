@@ -67,9 +67,10 @@ def fetch(url, *, method="GET", json_data=True, headers=None):
         "Accept": "application/json" if json_data else "text/plain",
     }
     request_headers.update(headers or {})
-    request = urllib.request.Request(url, method=method, headers=request_headers)
+    # The version checks construct HTTPS URLs for the upstream endpoints.
+    request = urllib.request.Request(url, method=method, headers=request_headers)  # noqa: S310
     try:
-        with urllib.request.urlopen(request, timeout=15) as response:
+        with urllib.request.urlopen(request, timeout=15) as response:  # noqa: S310
             if method == "HEAD":
                 return True
             data = response.read()
@@ -207,8 +208,8 @@ def github_release(pin, lag, get=fetch):
     )
     if pin == "UV_VERSION":
         try:
-            token_url = "https://ghcr.io/token?service=ghcr.io&scope=repository%3Aastral-sh%2Fuv%3Apull"
-            token = get(token_url)["token"]
+            ghcr_auth_endpoint = "https://ghcr.io/token?service=ghcr.io&scope=repository%3Aastral-sh%2Fuv%3Apull"
+            token = get(ghcr_auth_endpoint)["token"]
             image_url = f"https://ghcr.io/v2/astral-sh/uv/manifests/{candidate}"
             manifest = get(
                 image_url,

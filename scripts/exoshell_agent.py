@@ -20,8 +20,9 @@ from typing import Any
 
 CONTAINER_WORKSPACE = "/workspace"
 CONTAINER_HOME = "/sandbox"
-CONTAINER_SKILLS_SNAPSHOT = "/tmp/exoshell-skills"
-CONTAINER_INSTRUCTIONS = "/tmp/exoshell-instructions.md"
+# The launcher mounts both snapshots read-only at these paths inside the sandbox.
+CONTAINER_SKILLS_SNAPSHOT = "/tmp/exoshell-skills"  # noqa: S108
+CONTAINER_INSTRUCTIONS = "/tmp/exoshell-instructions.md"  # noqa: S108
 SYSTEM_CONFIG_FILE = Path("/etc/exoshell/exoshell.local.toml")
 AGENTS: dict[str, dict[str, Any]] = {
     "codex": {
@@ -621,7 +622,7 @@ def mount_config(settings: dict[str, Any]) -> dict[str, Any]:
             }
         )
     # Provision storage even when GWS is attached after sandbox creation.
-    mounts.append({"type": "tmpfs", "target": "/tmp/gws", "mode": 0o777})
+    mounts.append({"type": "tmpfs", "target": "/tmp/gws", "mode": 0o777})  # noqa: S108
     return {"podman": {"mounts": mounts}}
 
 
@@ -635,7 +636,8 @@ def git_identity(project: Path | None) -> tuple[str | None, str | None]:
     values: list[str] = []
     for key in ("user.name", "user.email"):
         try:
-            result = subprocess.run(
+            # Pass the project path and config key as arguments to Git.
+            result = subprocess.run(  # noqa: S603
                 [*command, "--get", key],
                 check=True,
                 capture_output=True,
@@ -1010,8 +1012,10 @@ def launch(settings: dict[str, Any], agent_args: Sequence[str]) -> int:
     """Check the image and launch while its snapshots remain alive."""
     if is_local_image(settings["image"]):
         try:
-            image_result = subprocess.run(
-                ["podman", "image", "exists", settings["image"]], check=False
+            # Use the installed Podman CLI and pass the image name as an argument.
+            image_result = subprocess.run(  # noqa: S603
+                ["podman", "image", "exists", settings["image"]],  # noqa: S607
+                check=False,
             )
         except FileNotFoundError as error:
             raise LauncherError(
@@ -1023,7 +1027,8 @@ def launch(settings: dict[str, Any], agent_args: Sequence[str]) -> int:
             )
     name, email = git_identity(settings["project"])
     try:
-        return subprocess.run(
+        # create_command builds the OpenShell argument list for the launch.
+        return subprocess.run(  # noqa: S603
             create_command(settings, agent_args, name, email), check=False
         ).returncode
     except FileNotFoundError as error:
