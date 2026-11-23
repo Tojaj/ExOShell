@@ -91,7 +91,8 @@ def load_yaml(path: Path) -> Any:
     """Load YAML safely, reporting duplicate and syntax errors with their file."""
     try:
         with path.open(encoding="utf-8") as stream:
-            return yaml.load(stream, Loader=StrictLoader)
+            # StrictLoader inherits SafeLoader and rejects duplicate keys.
+            return yaml.load(stream, Loader=StrictLoader)  # noqa: S506
     except OSError as error:
         raise PolicyError(f"cannot read {path}: {error.strerror or error}") from error
     except DuplicateKeyError as error:
@@ -262,8 +263,9 @@ def summarise_diff(before: dict[str, Any], after: dict[str, Any]) -> list[str]:
 
 def get_live_policy(sandbox: str) -> dict[str, Any]:
     """Fetch the live policy so static sections remain untouched."""
-    result = subprocess.run(
-        ["openshell", "policy", "get", sandbox, "--base", "-o", "json"],
+    # Use the installed OpenShell CLI and pass the sandbox name as an argument.
+    result = subprocess.run(  # noqa: S603
+        ["openshell", "policy", "get", sandbox, "--base", "-o", "json"],  # noqa: S607
         check=False,
         capture_output=True,
         text=True,
@@ -283,8 +285,9 @@ def revert_base_file(sandbox: str, explicit: str | None) -> Path:
     """Use an explicit baseline or the source recorded by the sandbox launcher."""
     if explicit is not None:
         return Path(explicit).expanduser()
-    result = subprocess.run(
-        ["openshell", "sandbox", "get", sandbox, "-o", "json"],
+    # Use the installed OpenShell CLI and pass the sandbox name as an argument.
+    result = subprocess.run(  # noqa: S603
+        ["openshell", "sandbox", "get", sandbox, "-o", "json"],  # noqa: S607
         check=False,
         capture_output=True,
         text=True,
@@ -335,7 +338,8 @@ def apply_policy(
         command = ["openshell", "policy", "set", sandbox, "--policy", temporary.name]
         if wait:
             command += ["--wait", "--timeout", str(timeout)]
-        result = subprocess.run(command, check=False)
+        # Pass the sandbox name and temporary policy path as OpenShell arguments.
+        result = subprocess.run(command, check=False)  # noqa: S603
         if result.returncode != 0:
             raise SystemExit(result.returncode)
     finally:

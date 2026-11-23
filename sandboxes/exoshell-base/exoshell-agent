@@ -11,7 +11,8 @@ import tempfile
 from pathlib import Path
 
 WORKSPACE = Path("/workspace")
-GWS_DIR = Path("/tmp/gws")
+# The launcher provisions this tmpfs mount inside the sandbox.
+GWS_DIR = Path("/tmp/gws")  # noqa: S108
 GWS_KEYS = ("GWS_CLIENT_ID", "GWS_CLIENT_SECRET", "GWS_REFRESH_TOKEN")
 ATLASSIAN_KEY = "ATLASSIAN_MCP_BEARER_TOKEN"
 CLAUDE_MCP_TEMPLATE = Path("/etc/exoshell/claude-atlassian.json")
@@ -32,9 +33,9 @@ def fail(message: str) -> None:
 def initialize_instructions(
     agent: str,
     environment: dict[str, str],
-    snapshot: Path = Path("/tmp/exoshell-instructions.md"),
+    snapshot: Path = Path("/tmp/exoshell-instructions.md"),  # noqa: S108
 ) -> None:
-    """Install the launch snapshot alongside existing personal guidance."""
+    """Install the read-only launcher snapshot alongside personal guidance."""
     if environment.pop("EXOSHELL_IMPORT_INSTRUCTIONS", None) is None:
         return
     home = Path(environment.get("HOME", "/sandbox"))
@@ -76,9 +77,9 @@ def initialize_instructions(
 def initialize_skills(
     environment: dict[str, str],
     destination: Path = SKILLS_DIR,
-    snapshot_path: Path = Path("/tmp/exoshell-skills"),
+    snapshot_path: Path = Path("/tmp/exoshell-skills"),  # noqa: S108
 ) -> None:
-    """Copy the launcher snapshot once, preserving every existing image skill."""
+    """Copy the read-only launcher snapshot once, preserving image skills."""
     snapshot = environment.pop("EXOSHELL_SKILLS_SNAPSHOT", None)
     if snapshot is None:
         return
@@ -118,7 +119,8 @@ def initialize_codex_auth(
     if Path(command[0]).name != "codex" or not credential:
         return
     try:
-        result = subprocess.run(
+        # Use the selected Codex executable and send the credential on stdin.
+        result = subprocess.run(  # noqa: S603
             [command[0], "login", "--with-api-key"],
             check=False,
             input=credential.encode("utf-8"),
@@ -377,7 +379,8 @@ def main(arguments: list[str]) -> None:
     except OSError:
         fail("could not enter PROJECT")
     try:
-        os.execvpe(command[0], command, environment)
+        # Replace this startup process with the selected agent process.
+        os.execvpe(command[0], command, environment)  # noqa: S606
     except FileNotFoundError:
         fail(f"command not found: {arguments[2]}")
     except OSError:

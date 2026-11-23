@@ -1,7 +1,13 @@
 target-version = "py311"
 extend-include = ["sandboxes/exoshell-base/exoshell-agent"]
 
+[lint]
+extend-select = ["S"]
+
 [lint.per-file-ignores]
+# Tests may use assert and invoke the commands and fixtures they exercise.
+"tests/**" = ["S101", "S603", "S607"]
+".agents/skills/bump-exoshell-base-versions/tests/**" = ["S101"]
 # These image/skill helpers are deliberately invoked through Python.
 ".agents/skills/bump-exoshell-base-versions/scripts/check_versions.py" = ["EXE001"]
 "sandboxes/exoshell-base/render-agent-instructions.py" = ["EXE001"]
