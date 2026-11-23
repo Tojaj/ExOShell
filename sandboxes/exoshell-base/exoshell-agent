@@ -29,6 +29,50 @@ def fail(message: str) -> None:
     raise SystemExit(2)
 
 
+def initialize_instructions(
+    agent: str,
+    environment: dict[str, str],
+    snapshot: Path = Path("/tmp/exoshell-instructions.md"),
+) -> None:
+    """Install the launch snapshot alongside existing personal guidance."""
+    if environment.pop("EXOSHELL_IMPORT_INSTRUCTIONS", None) is None:
+        return
+    home = Path(environment.get("HOME", "/sandbox"))
+    if agent == "codex":
+        directory = Path(environment.get("CODEX_HOME") or home / ".codex")
+        override = directory / "AGENTS.override.md"
+        target = directory / "AGENTS.md"
+        if override.is_file() and override.read_text(encoding="utf-8").strip():
+            target = override
+    elif agent == "claude":
+        directory = Path(environment.get("CLAUDE_CONFIG_DIR") or home / ".claude")
+        target = directory / "CLAUDE.md"
+    elif agent == "opencode":
+        directory = Path(environment.get("XDG_CONFIG_HOME") or home / ".config")
+        target = directory / "opencode" / "AGENTS.md"
+    else:
+        fail(f"unsupported agent for user instructions: {agent}")
+
+    content = snapshot.read_bytes()
+    target.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
+    try:
+        existing = target.read_bytes()
+    except FileNotFoundError:
+        existing = b""
+    if existing == content or existing.endswith(b"\n\n" + content):
+        return
+    with tempfile.NamedTemporaryFile(dir=target.parent, delete=False) as output:
+        temporary = Path(output.name)
+        try:
+            if existing:
+                output.write(existing.rstrip(b"\n") + b"\n\n")
+            output.write(content)
+            output.flush()
+            os.replace(temporary, target)
+        finally:
+            temporary.unlink(missing_ok=True)
+
+
 def initialize_skills(
     environment: dict[str, str],
     destination: Path = SKILLS_DIR,
@@ -319,6 +363,10 @@ def main(arguments: list[str]) -> None:
 
     environment = os.environ.copy()
     initialize_skills(environment)
+    try:
+        initialize_instructions(Path(arguments[2]).name, environment)
+    except (OSError, UnicodeError) as error:
+        fail(f"could not install user instructions: {error}")
     initialize_opencode_defaults(arguments[2:], environment)
     initialize_opencode_websearch(arguments[2:], environment)
     command = initialize_atlassian_mcp(arguments[2:], environment, project)

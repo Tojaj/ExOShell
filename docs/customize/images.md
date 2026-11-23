@@ -93,6 +93,8 @@ passed to `--from`; build and tag the image first.
 
 ## Shared agent instructions
 
+For personal guidance, use the [launcher instruction settings](../guide/configuration.md#add-personal-instructions).
+
 The base image keeps operational guidance under `/etc/exoshell/instructions/`.
 At build time, it combines all top-level `*.md` files in filename order into
 Codex's `developer_instructions` in `/etc/codex/config.toml` and Claude's

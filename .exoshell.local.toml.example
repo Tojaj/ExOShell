@@ -38,6 +38,10 @@ providers = ["exoshell-github", "exoshell-gws"]
 # Symlinks are expanded into copies; names must not collide with image skills.
 # skills = ["~/.agents/skills", "../shared-skills", "../tools/example-skill"]
 
+# Personal guidance is optional. Paths load in order, then inline text.
+# instructions = ["instructions/review.md", "~/agent-guidance/"]
+# instruction_text = "Run focused tests before the full suite."
+
 [agents.codex]
 providers = ["exoshell-codex"]
 # model = "gpt-6-sol"
