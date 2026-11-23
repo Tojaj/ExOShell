@@ -177,7 +177,7 @@ COPY --chmod=0644 agent-instructions/ /etc/exoshell/instructions/
 COPY --chmod=0644 render-agent-instructions.py /usr/local/lib/exoshell/render-agent-instructions.py
 RUN python3 /usr/local/lib/exoshell/render-agent-instructions.py
 COPY --chmod=0755 exoshell-agent /usr/local/bin/exoshell-agent
-RUN touch /etc/exoshell/skills-import-v1
+RUN touch /etc/exoshell/skills-import-v1 /etc/exoshell/instructions-import-v1
 # Global defaults keep the image-pinned OpenCode version from updating while
 # allowing project configuration to override them.
 COPY --chown=sandbox:sandbox --chmod=0644 opencode.json /sandbox/.config/opencode/opencode.json

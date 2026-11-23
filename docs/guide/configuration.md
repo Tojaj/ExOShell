@@ -41,8 +41,36 @@ candidates are skipped, but an invalid, unreadable, or non-file candidate stops
 the launch, as does a missing explicit `--config` file.
 
 Each `--no-*` option discards the configured value for one launch rather than
-replacing it: `--no-providers`, `--no-policy`, `--no-skills`, `--no-model`,
+replacing it: `--no-providers`, `--no-policy`, `--no-skills`, `--no-instructions`, `--no-model`,
 `--no-effort`, `--no-kubeconfig`, `--no-github-host`, and `--no-gitlab-host`.
+
+## Add personal instructions
+
+Set either or both common keys in your launcher configuration. List files and
+directories in reading order. Each directory contributes its top-level
+`*.md` files sorted by filename. Files use UTF-8. The launcher adds
+`instruction_text` after the last path. A one-line string also works.
+
+```toml
+instructions = ["instructions/review.md", "~/agent-guidance/"]
+instruction_text = """
+Run focused tests before the full suite.
+Include the test commands in your handoff.
+"""
+```
+
+For one launch, supply a new selection in command-line order. Either input flag
+replaces both TOML settings. Use `--no-instructions` to skip both.
+
+```bash
+./run-exoshell-agent.sh --instruction ./review.md \
+  --instruction-text 'Summarize the test results.' /path/to/project
+```
+
+The launcher takes a private snapshot before creating the sandbox. Missing
+sources and directories with no matching files stop the launch. The selected
+agent loads the snapshot as personal guidance alongside the image defaults.
+Rebuild older images before using this feature.
 
 ## Choose a policy
 

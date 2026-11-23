@@ -14,12 +14,14 @@ import sys
 import tempfile
 import tomllib
 from collections.abc import Sequence
+from contextlib import ExitStack
 from pathlib import Path
 from typing import Any
 
 CONTAINER_WORKSPACE = "/workspace"
 CONTAINER_HOME = "/sandbox"
 CONTAINER_SKILLS_SNAPSHOT = "/tmp/exoshell-skills"
+CONTAINER_INSTRUCTIONS = "/tmp/exoshell-instructions.md"
 SYSTEM_CONFIG_FILE = Path("/etc/exoshell/exoshell.local.toml")
 AGENTS: dict[str, dict[str, Any]] = {
     "codex": {
@@ -47,6 +49,8 @@ DEFAULTS: dict[str, Any] = {
     "model": None,
     "effort": None,
     "skills": [],
+    "instructions": [],
+    "instruction_text": None,
 }
 CONFIG_KEYS = (set(DEFAULTS) - {"keep", "model", "effort"}) | {"agents", "host_share"}
 PATH_KEYS = {"host_share", "policy", "kubeconfig"}
@@ -58,6 +62,12 @@ HOST_RE = re.compile(
 
 class LauncherError(Exception):
     """An actionable user configuration error."""
+
+
+def _instruction_path(value: str) -> Path:
+    if not value.strip():
+        raise argparse.ArgumentTypeError("instruction path cannot be empty")
+    return Path(value)
 
 
 def parser(*, prog: str = "run-exoshell-agent.sh") -> argparse.ArgumentParser:
@@ -105,6 +115,21 @@ def parser(*, prog: str = "run-exoshell-agent.sh") -> argparse.ArgumentParser:
     )
     result.add_argument(
         "--host-share", type=Path, help="host directory mounted at /workspace"
+    )
+    # The shared destination retains the order of mixed file and text flags.
+    for option, kind in (("--instruction", "PATH"), ("--instruction-text", "TEXT")):
+        result.add_argument(
+            option,
+            dest="instruction_inputs",
+            action="append",
+            metavar=kind,
+            type=_instruction_path if kind == "PATH" else str,
+            help=f"add instruction {kind.lower()} (repeatable; replaces configured instructions)",
+        )
+    result.add_argument(
+        "--no-instructions",
+        action="store_true",
+        help="ignore configured instruction paths and text",
     )
     skills = result.add_mutually_exclusive_group()
     skills.add_argument(
@@ -247,12 +272,12 @@ def load_config(path: Path, *, required: bool) -> dict[str, Any]:
         raise LauncherError(f"unknown configuration key(s): {', '.join(unknown)}")
 
     for key, value in data.items():
-        if key == "skills":
+        if key in ("skills", "instructions"):
             if not isinstance(value, list) or any(
                 type(item) is not str or not item.strip() for item in value
             ):
                 raise LauncherError(
-                    "configuration key 'skills' must be an array of non-empty paths"
+                    f"configuration key '{key}' must be an array of non-empty paths"
                 )
         elif key == "providers":
             _provider_list(value, key)
@@ -297,8 +322,9 @@ def load_config(path: Path, *, required: bool) -> dict[str, Any]:
 
     for key in PATH_KEYS & data.keys():
         data[key] = _resolve_path(data[key], path.parent)
-    if "skills" in data:
-        data["skills"] = [_resolve_path(item, path.parent) for item in data["skills"]]
+    for key in ("skills", "instructions"):
+        if key in data:
+            data[key] = [_resolve_path(item, path.parent) for item in data[key]]
     return data
 
 
@@ -355,6 +381,20 @@ def resolve_settings(
     # Keep the final symlink's name: it may be a deliberate skill alias.
     settings["skills"] = [
         Path(os.path.abspath(_resolve_path(item, cwd))) for item in selected_skills
+    ]
+
+    inputs = list(settings.pop("instructions"))
+    inline = settings.pop("instruction_text")
+    if inline is not None:
+        inputs.append(inline)
+    if args.no_instructions:
+        if args.instruction_inputs:
+            raise LauncherError("--no-instructions conflicts with instruction flags")
+        inputs = []
+    elif args.instruction_inputs:
+        inputs = args.instruction_inputs
+    settings["instruction_inputs"] = [
+        _resolve_path(item, cwd) if isinstance(item, Path) else item for item in inputs
     ]
 
     if args.host_share is not None:
@@ -452,6 +492,40 @@ def project_label(project: Path | None) -> str:
     return normalized[:63] or "project"
 
 
+def render_user_instructions(inputs: Sequence[Path | str]) -> str:
+    parts = []
+    for item in inputs:
+        if isinstance(item, str):
+            if not item.strip():
+                raise LauncherError("instruction text cannot be blank")
+            parts.append(item.rstrip("\n"))
+            continue
+        try:
+            files = [item]
+            if item.is_dir():
+                files = sorted(
+                    p
+                    for p in item.iterdir()
+                    if p.name.endswith(".md") and not p.is_dir()
+                )
+                if not files:
+                    raise LauncherError(f"no top-level Markdown files in {item}")
+            for path in files:
+                if not stat.S_ISREG(path.stat().st_mode):
+                    raise LauncherError(
+                        f"instruction source is not a regular file: {path}"
+                    )
+                try:
+                    parts.append(path.read_text(encoding="utf-8").rstrip("\n"))
+                except UnicodeError as error:
+                    raise LauncherError(
+                        f"instruction file is not UTF-8: {path}"
+                    ) from error
+        except OSError as error:
+            raise LauncherError(f"cannot read instruction source: {error}") from error
+    return "\n\n".join(parts) + "\n"
+
+
 def select_skills(sources: Sequence[Path]) -> dict[str, Path]:
     """Select individual skills or immediate collection children, preserving aliases."""
     selected: dict[str, Path] = {}
@@ -531,12 +605,17 @@ def mount_config(settings: dict[str, Any]) -> dict[str, Any]:
                 "selinux_label": "shared",
             }
         )
-    if settings.get("skills_snapshot") is not None:
+    for key, target in (
+        ("skills_snapshot", CONTAINER_SKILLS_SNAPSHOT),
+        ("instruction_snapshot", CONTAINER_INSTRUCTIONS),
+    ):
+        if settings.get(key) is None:
+            continue
         mounts.append(
             {
                 "type": "bind",
-                "source": str(settings["skills_snapshot"]),
-                "target": CONTAINER_SKILLS_SNAPSHOT,
+                "source": str(settings[key]),
+                "target": target,
                 "read_only": True,
                 "selinux_label": "shared",
             }
@@ -811,21 +890,27 @@ def create_command(
         "--driver-config-json="
         + json.dumps(mount_config(settings), separators=(",", ":"))
     )
+    if settings.get("instruction_snapshot") is not None:
+        command.extend(["--env", "EXOSHELL_IMPORT_INSTRUCTIONS=1"])
     command.append("--")
-    if settings.get("skills_snapshot") is not None:
-        # Older images must fail rather than silently starting without imports.
-        command.extend(
-            [
-                "/bin/sh",
-                "-c",
-                (
-                    "if [ ! -f /etc/exoshell/skills-import-v1 ]; then "
-                    'echo "exoshell: image lacks skill import support; rebuild the sandbox image" >&2; '
-                    'exit 2; fi; exec "$@"'
-                ),
-                "exoshell-skills",
-            ]
-        )
+    # Fail explicitly when an older image cannot consume a requested snapshot.
+    for key, marker, label in (
+        ("skills_snapshot", "skills-import-v1", "skill"),
+        ("instruction_snapshot", "instructions-import-v1", "instruction"),
+    ):
+        if settings.get(key) is not None:
+            command.extend(
+                [
+                    "/bin/sh",
+                    "-c",
+                    (
+                        f"if [ ! -f /etc/exoshell/{marker} ]; then "
+                        f'echo "exoshell: image lacks {label} import support; rebuild the sandbox image" >&2; '
+                        'exit 2; fi; exec "$@"'
+                    ),
+                    f"exoshell-{label}s",
+                ]
+            )
     command.extend(
         [
             "/usr/local/bin/exoshell-agent",
@@ -887,18 +972,42 @@ def run(argv: Sequence[str], *, cwd: Path) -> int:
             "skills",
         ):
             _verbose_value(key, settings[key])
+        _verbose_value(
+            "instruction_inputs",
+            [
+                item if isinstance(item, Path) else "<inline text>"
+                for item in settings["instruction_inputs"]
+            ],
+        )
     selected_skills = select_skills(settings["skills"])
-    if not selected_skills:
-        return launch(settings, agent_args)
-    with tempfile.TemporaryDirectory(prefix="exoshell-skills-") as temporary:
-        settings["skills_snapshot"] = Path(temporary)
-        for skill_name, source in selected_skills.items():
-            copy_skill_snapshot(source, Path(temporary) / skill_name)
+    with ExitStack() as snapshots:
+        if selected_skills:
+            directory = Path(
+                snapshots.enter_context(
+                    tempfile.TemporaryDirectory(prefix="exoshell-skills-")
+                )
+            )
+            settings["skills_snapshot"] = directory
+            for skill_name, source in selected_skills.items():
+                copy_skill_snapshot(source, directory / skill_name)
+        if settings["instruction_inputs"]:
+            content = render_user_instructions(settings["instruction_inputs"])
+            try:
+                snapshot = snapshots.enter_context(
+                    tempfile.NamedTemporaryFile(
+                        prefix="exoshell-instructions-", mode="w", encoding="utf-8"
+                    )
+                )
+                snapshot.write(content)
+                snapshot.flush()
+            except (OSError, UnicodeError) as error:
+                raise LauncherError("could not write instruction snapshot") from error
+            settings["instruction_snapshot"] = Path(snapshot.name)
         return launch(settings, agent_args)
 
 
 def launch(settings: dict[str, Any], agent_args: Sequence[str]) -> int:
-    """Check the image and launch while any skill snapshot remains alive."""
+    """Check the image and launch while its snapshots remain alive."""
     if is_local_image(settings["image"]):
         try:
             image_result = subprocess.run(

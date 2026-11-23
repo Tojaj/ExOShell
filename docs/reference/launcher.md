@@ -19,6 +19,9 @@ complete help, run `./run-exoshell-agent.sh --help`.
 | `--host-share PATH` | `host_share` | Mount a source tree containing the selected project |
 | `--no-share` | — | Suppress project and kubeconfig mounts; use a disposable workspace |
 | `--skill PATH` / `--no-skills` | `skills` | Repeat to replace skill sources, or disable imports |
+| `--instruction PATH` | `instructions` | Add a file or directory of instructions (repeatable) |
+| `--instruction-text TEXT` | `instruction_text` | Add literal text (repeatable). Either input flag replaces both configured inputs in CLI order |
+| `--no-instructions` | — | Skip all personal instruction inputs for this launch |
 | `--model VALUE` / `--no-model` | `agents.<agent>.model` | Override or suppress the starting model setting |
 | `--effort VALUE` / `--no-effort` | `agents.<agent>.effort` | Override or suppress the starting effort setting |
 | `--kubeconfig PATH` / `--no-kubeconfig` | `kubeconfig` | Mount a kubeconfig read-only, or disable the mount |

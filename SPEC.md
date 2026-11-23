@@ -96,6 +96,22 @@ up when the OpenShell subprocess returns, including failures and interruption;
 The baseline policy grants the real skills directory read/write access.
 See ADR-0038.
 
+The optional common `instructions` array selects UTF-8 files or directories.
+Each directory contributes immediate `*.md` files in filename order. The
+optional `instruction_text` string follows all configured paths. Either
+repeatable CLI option (`--instruction PATH` or `--instruction-text TEXT`)
+replaces both configured inputs, preserving CLI order. Paths use the same
+base directories and home expansion as skills. Mutually exclusive
+`--no-instructions` skips source inspection. Missing or unreadable sources
+and directories without matching files fail before provisioning.
+
+Selected inputs are separated by blank lines in a private host snapshot
+mounted read-only at `/tmp/exoshell-instructions.md`. Startup requires the
+image instruction-import marker and installs the content in the selected
+agent's personal instructions. The launcher cleans up the host snapshot on
+exit. Verbose diagnostics identify paths and literal text entries while
+omitting text contents. See [ADR-0047](adrs/adr0047-user-supplied-agent-instructions.md).
+
 The launcher injects the selected project's effective Git name and email.
 With `--no-share`, it reads only global host Git configuration and injects
 identity when both name and email are present. Missing or partial identity

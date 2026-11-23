@@ -436,6 +436,7 @@ class DiscoveryTests(unittest.TestCase):
             "project": str(self.cwd),
             "container_project": "/workspace",
             "skills": [],
+            "instruction_inputs": [],
         }
         for arguments in (("-v",), ("--verbose",), ("-v", "--verbose")):
             with self.subTest(arguments=arguments):
@@ -536,7 +537,7 @@ class DiscoveryTests(unittest.TestCase):
                 mock.patch.object(stderr, "flush", wraps=stderr.flush) as flush,
             ):
                 self.assertEqual(launcher.run(["-v", "--no-policy"], cwd=self.cwd), 0)
-            self.assertEqual(flush.call_count, 16)
+            self.assertEqual(flush.call_count, 17)
 
 
 class ResolutionTests(unittest.TestCase):
