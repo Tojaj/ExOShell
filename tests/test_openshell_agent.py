@@ -1236,6 +1236,134 @@ class LauncherIntegrationTests(unittest.TestCase):
             )
 
 
+class AgentLaunchHookTests(unittest.TestCase):
+    HELPER = ROOT / "sandboxes/exoshell-base/exoshell-agent"
+    ARGUMENTS = ("model with spaces", "", "--", "$(touch nope)")
+
+    def setUp(self) -> None:
+        self.root = Path(self.enterContext(tempfile.TemporaryDirectory())).resolve()
+        self.project = self.root / "project with spaces"
+        self.project.mkdir()
+        self.hook = self.root / "agent-launch"
+        self.client = self.root / "opencode"
+        self.client.write_text(
+            textwrap.dedent("""\
+                #!/usr/bin/env python3
+                import json
+                import os
+                import sys
+
+                config = json.loads(os.environ["OPENCODE_CONFIG_CONTENT"])
+                disabled = config["mcp"]["servers"]["atlassian"]["disabled"]
+                print(json.dumps([os.getcwd(), os.environ.get("HOOK_CWD"),
+                                  disabled, sys.argv[1:]]))
+                sys.exit(17)
+                """),
+            encoding="utf-8",
+        )
+        self.client.chmod(0o755)
+        self.url = "https://search.example.com/docs/mcp"
+        url_file = self.root / "mcp-url"
+        url_file.write_text(self.url + "\n", encoding="utf-8")
+        self.environment = {
+            "PATH": os.environ.get("PATH", os.defpath),
+            "SEARCH_MCP_URL_FILE": str(url_file),
+        }
+
+    def launch(self) -> subprocess.CompletedProcess[str]:
+        bootstrap = textwrap.dedent("""\
+            import runpy
+            import sys
+            from pathlib import Path
+
+            helper, hook, workspace, *arguments = sys.argv[1:]
+            main = runpy.run_path(helper)["main"]
+            main.__globals__.update(AGENT_LAUNCH_HOOK=Path(hook), WORKSPACE=Path(workspace))
+            main(arguments)
+            """)
+        return subprocess.run(
+            [
+                sys.executable,
+                "-c",
+                bootstrap,
+                str(self.HELPER),
+                str(self.hook),
+                str(self.root),
+                str(self.project),
+                "--",
+                str(self.client),
+                *self.ARGUMENTS,
+            ],
+            check=False,
+            capture_output=True,
+            text=True,
+            env=self.environment,
+        )
+
+    def test_absent_hook_starts_client_directly(self) -> None:
+        result = self.launch()
+        self.assertEqual(result.returncode, 17, result.stderr)
+        self.assertEqual(
+            json.loads(result.stdout),
+            [str(self.project), None, True, list(self.ARGUMENTS)],
+        )
+
+    def test_hook_uses_prepared_environment_and_project_directory(self) -> None:
+        script = textwrap.dedent("""\
+            #!/usr/bin/env python3
+            import json
+            import os
+            import sys
+            from pathlib import Path
+
+            config = json.loads(os.environ["OPENCODE_CONFIG_CONTENT"])
+            assert config["mcp"]["servers"]["atlassian"]["disabled"] is True
+            os.environ["HOOK_CWD"] = os.getcwd()
+            url = Path(os.environ["SEARCH_MCP_URL_FILE"]).read_text().strip()
+            client, *arguments = sys.argv[1:]
+            os.execv(client, [client, url, *arguments])
+            """)
+        target = self.root / "hook-target"
+        self.hook.write_text(script, encoding="utf-8")
+        self.hook.chmod(0o755)
+        for symlink in (False, True):
+            with self.subTest(symlink=symlink):
+                if symlink:
+                    self.hook.rename(target)
+                    self.hook.symlink_to(target)
+                result = self.launch()
+                self.assertEqual(result.returncode, 17, result.stderr)
+                self.assertEqual(
+                    json.loads(result.stdout),
+                    [
+                        str(self.project),
+                        str(self.project),
+                        True,
+                        [self.url, *self.ARGUMENTS],
+                    ],
+                )
+
+    def test_installed_hook_execution_failures_stop_startup(self) -> None:
+        self.hook.write_text('#!/bin/sh\nexec "$@"\n', encoding="utf-8")
+        self.hook.chmod(0o644)
+        self.assert_hook_startup_failure()
+
+        missing = self.root / "missing"
+        self.hook.write_text(f"#!{missing}\n", encoding="utf-8")
+        self.hook.chmod(0o755)
+        self.assert_hook_startup_failure()
+
+        self.hook.unlink()
+        self.hook.symlink_to(missing)
+        self.assert_hook_startup_failure()
+
+    def assert_hook_startup_failure(self) -> None:
+        result = self.launch()
+        self.assertEqual(result.returncode, 2, result.stderr)
+        self.assertIn(f"could not start launch hook {self.hook}", result.stderr)
+        self.assertEqual(result.stdout, "")
+
+
 class ImageStartupTests(unittest.TestCase):
     HELPER = ROOT / "sandboxes/exoshell-base/exoshell-agent"
 
