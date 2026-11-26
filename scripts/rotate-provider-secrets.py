@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Interactively replace stored credentials for bundled ExOShell profiles."""
+"""Interactively replace stored OpenShell provider credentials."""
 
 from __future__ import annotations
 
@@ -112,7 +112,13 @@ def rotate(name: str, credentials: list[tuple[str, list[str]]]) -> bool:
 
 
 def main() -> int:
-    argparse.ArgumentParser(description=__doc__).parse_args()
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument(
+        "--all",
+        action="store_true",
+        help="include providers outside the bundled ExOShell profiles",
+    )
+    args = parser.parse_args()
     if not sys.stdin.isatty():
         print(
             "Run this helper from an interactive terminal on the gateway host.",
@@ -126,25 +132,36 @@ def main() -> int:
         profiles[profile["id"]] = profile
 
     # OpenShell resolves the gateway and workspace from its active configuration.
-    entries = [
-        (
-            provider["name"],
-            provider["type"],
-            stored_credentials(provider, profiles[provider["type"]]),
-        )
-        for provider in list_providers()
-        if provider["type"] in profiles
-    ]
+    entries = []
+    for provider in list_providers():
+        profile_id = provider["type"]
+        if profile_id in profiles:
+            credentials = stored_credentials(provider, profiles[profile_id])
+        elif args.all:
+            credentials = [(key, [key]) for key in provider["credential_keys"]]
+        else:
+            continue
+        entries.append((provider["name"], profile_id, credentials))
     if not entries:
-        print("No provider instances match the bundled ExOShell profiles.")
+        if args.all:
+            print("No providers found in the active OpenShell workspace.")
+        else:
+            print("No provider instances match the bundled ExOShell profiles.")
         return 0
 
+    heading = "Providers" if args.all else "ExOShell providers"
     status = 0
     while True:
-        print("\nExOShell providers in the active OpenShell workspace")
+        print(f"\n{heading} in the active OpenShell workspace")
         for index, (name, profile_id, credentials) in enumerate(entries, 1):
             label = str(index) if credentials else "-"
-            suffix = "" if credentials else " [no matching stored credentials]"
+            suffix = ""
+            if not credentials:
+                suffix = (
+                    " [no matching stored credentials]"
+                    if profile_id in profiles
+                    else " [no stored credentials]"
+                )
             print(f"  {label:>2}  {name} ({profile_id}){suffix}")
         if not any(credentials for _, _, credentials in entries):
             return status
