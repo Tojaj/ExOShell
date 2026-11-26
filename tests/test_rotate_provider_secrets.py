@@ -29,9 +29,12 @@ registry = dict(name="public-packages", type="exoshell-pypi-packages-ro",
                 credential_keys=[])
 workspace = dict(name="mail", type="exoshell-gws-cli",
                  credential_keys=["GWS_CLIENT_ID", "GWS_CLIENT_SECRET", "GWS_REFRESH_TOKEN"])
-other = dict(name="unbundled", type="custom", credential_keys=["CUSTOM_TOKEN"])
+other = dict(name="unbundled", type="custom",
+             credential_keys=["CUSTOM_CLIENT_ID", "CUSTOM_TOKEN"],
+             config_keys=["CUSTOM_ENDPOINT"])
+public = dict(name="unbundled-public", type="custom", credential_keys=[])
 if args == ["provider", "list", "-o", "json"]:
-    print(json.dumps(dict(providers=[registry, other], next_page_token="more")))
+    print(json.dumps(dict(providers=[registry, other, public], next_page_token="more")))
 elif args == ["provider", "list", "-o", "json", "--page-token", "more"]:
     print(json.dumps(dict(providers=[github, workspace], next_page_token="")))
 elif args[:3] == ["provider", "update", "work-forge"]:
@@ -42,6 +45,10 @@ elif args[:3] == ["provider", "update", "work-forge"]:
 elif args[:3] == ["provider", "update", "mail"]:
     assert os.environ["GWS_REFRESH_TOKEN"] == "fake-refresh-token"
     assert not {"GWS_CLIENT_ID", "GWS_CLIENT_SECRET", "GH_TOKEN", "GITHUB_TOKEN"} & os.environ.keys()
+elif args[:3] == ["provider", "update", "unbundled"]:
+    assert os.environ["CUSTOM_TOKEN"] == "fake-custom-token"
+    assert "CUSTOM_CLIENT_ID" not in os.environ
+    print(os.environ["CUSTOM_TOKEN"])
 else:
     sys.exit(99)
 """
@@ -52,7 +59,7 @@ GITHUB_CONFIRM = "Save replacements for work-forge (GITHUB_TOKEN, GH_TOKEN)? [y/
 
 
 class RotationTests(unittest.TestCase):
-    def start(self, *, update_exit: int = 0) -> None:
+    def start(self, *args: str, update_exit: int = 0) -> None:
         temporary = tempfile.TemporaryDirectory()
         self.addCleanup(temporary.cleanup)
         self.directory = Path(temporary.name)
@@ -61,7 +68,13 @@ class RotationTests(unittest.TestCase):
         cli.chmod(0o755)
         env = dict(os.environ, PATH=f"{self.directory}:{os.environ['PATH']}")
         env["TEST_UPDATE_EXIT"] = str(update_exit)
-        for key in ("GWS_CLIENT_ID", "GWS_CLIENT_SECRET", "GH_TOKEN", "GITHUB_TOKEN"):
+        for key in (
+            "GWS_CLIENT_ID",
+            "GWS_CLIENT_SECRET",
+            "GH_TOKEN",
+            "GITHUB_TOKEN",
+            "CUSTOM_CLIENT_ID",
+        ):
             env.pop(key, None)
 
         try:
@@ -81,6 +94,7 @@ class RotationTests(unittest.TestCase):
                     "runpy.run_path(sys.argv.pop(1), run_name='__main__')"
                 ),
                 str(SCRIPT),
+                *args,
             ]
             self.process = subprocess.Popen(
                 command,
@@ -98,7 +112,7 @@ class RotationTests(unittest.TestCase):
             self.addCleanup(os.close, terminal)
             try:
                 self.process = subprocess.Popen(
-                    [sys.executable, str(SCRIPT)],
+                    [sys.executable, str(SCRIPT), *args],
                     stdin=slave,
                     stdout=slave,
                     stderr=slave,
@@ -191,6 +205,45 @@ class RotationTests(unittest.TestCase):
                     "GH_TOKEN",
                 ],
                 ["provider", "update", "mail", "--credential", "GWS_REFRESH_TOKEN"],
+            ],
+        )
+
+    def test_all_rotates_a_stored_key_for_an_unbundled_provider(self) -> None:
+        self.start("--all")
+        self.assertIn(b"Providers in the active OpenShell workspace", self.transcript)
+        self.assertIn(b"2  unbundled (custom)", self.transcript)
+        self.assertIn(
+            b"-  unbundled-public (custom) [no stored credentials]", self.transcript
+        )
+        self.send("3")
+        self.expect("Choose a numbered provider.")
+        self.expect(MENU)
+
+        self.send("2")
+        self.expect("CUSTOM_CLIENT_ID (Enter to skip): ")
+        self.send()
+        self.expect("CUSTOM_TOKEN (Enter to skip): ")
+        self.send("fake-custom-token")
+        self.expect("Save replacements for unbundled (CUSTOM_TOKEN)? [y/N] ")
+        self.send("y")
+        self.expect("Saved credential replacements for unbundled.")
+        self.expect(MENU)
+
+        self.send("4")
+        self.expect(GITHUB_PROMPT)
+        self.send()
+        self.expect(MENU)
+        self.send()
+
+        self.assertEqual(self.process.wait(timeout=5), 0)
+        self.assertNotIn(b"CUSTOM_ENDPOINT", self.transcript)
+        self.assertNotIn(b"fake-custom-token", self.transcript)
+        self.assertEqual(
+            self.commands(),
+            [
+                ["provider", "list", "-o", "json"],
+                ["provider", "list", "-o", "json", "--page-token", "more"],
+                ["provider", "update", "unbundled", "--credential", "CUSTOM_TOKEN"],
             ],
         )
 

@@ -15,6 +15,16 @@ Press Enter to skip a credential. For example, a GitHub token prompt updates
 both aliases if the instance stores both. For Google Workspace, you can skip
 the client ID and client secret and replace just the refresh token.
 
+To include every provider in the active workspace, run:
+
+```bash
+./scripts/rotate-provider-secrets.py --all
+```
+
+For providers outside the bundled profiles, the helper uses the stored
+credential environment variable names from OpenShell and prompts for each key
+individually. Providers with no stored credentials are visible and unselectable.
+
 Review the instance name and credential keys, then enter `y` to save. The
 helper sends the values to OpenShell in the update command's environment.
 Press Enter at the confirmation prompt to discard the replacements, or press
