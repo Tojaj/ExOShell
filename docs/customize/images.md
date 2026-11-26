@@ -91,6 +91,33 @@ For a remote gateway, push the image to a registry the gateway can access and
 use that fully qualified image reference. OpenShell does not build a Dockerfile
 passed to `--from`; build and tag the image first.
 
+## Agent launch hook
+
+A derived image can install an executable at
+`/usr/local/lib/exoshell/agent-launch` to use settings that become available at
+sandbox startup, such as a provider-managed file containing an MCP endpoint URL.
+
+```dockerfile
+COPY --chmod=0755 agent-launch /usr/local/lib/exoshell/agent-launch
+```
+
+After built-in initialization, `exoshell-agent` enters the project directory
+and runs the hook as the sandbox user with the prepared environment. The hook
+receives the client executable as its first argument, followed by the client's
+arguments. Argument boundaries, empty arguments, and a literal `--` are preserved.
+The hook can update the environment or arguments before replacing itself with
+the client. A minimal pass-through `agent-launch` is:
+
+```sh
+#!/bin/sh
+exec "$@"
+```
+
+ExOShell uses this fixed path for discovery. The image may install a symlink
+there. An installed hook that cannot be executed, including a dangling symlink,
+fails startup. With no hook installed, `exoshell-agent` starts the client
+directly. Invoking the client binary directly bypasses the hook.
+
 ## Shared agent instructions
 
 For personal guidance, use the [launcher instruction settings](../guide/configuration.md#add-personal-instructions).

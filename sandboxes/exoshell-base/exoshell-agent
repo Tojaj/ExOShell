@@ -11,6 +11,7 @@ import tempfile
 from pathlib import Path
 
 WORKSPACE = Path("/workspace")
+AGENT_LAUNCH_HOOK = Path("/usr/local/lib/exoshell/agent-launch")
 # The launcher provisions this tmpfs mount inside the sandbox.
 GWS_DIR = Path("/tmp/gws")  # noqa: S108
 GWS_KEYS = ("GWS_CLIENT_ID", "GWS_CLIENT_SECRET", "GWS_REFRESH_TOKEN")
@@ -378,6 +379,22 @@ def main(arguments: list[str]) -> None:
         os.chdir(project)
     except OSError:
         fail("could not enter PROJECT")
+
+    try:
+        # Inspect the directory entry so a dangling symlink fails at exec.
+        AGENT_LAUNCH_HOOK.lstat()
+    except FileNotFoundError:
+        pass
+    except OSError as error:
+        fail(f"could not inspect launch hook {AGENT_LAUNCH_HOOK}: {error.strerror}")
+    else:
+        try:
+            os.execve(  # noqa: S606
+                AGENT_LAUNCH_HOOK, [str(AGENT_LAUNCH_HOOK), *command], environment
+            )
+        except OSError as error:
+            fail(f"could not start launch hook {AGENT_LAUNCH_HOOK}: {error.strerror}")
+
     try:
         # Replace this startup process with the selected agent process.
         os.execvpe(command[0], command, environment)  # noqa: S606
